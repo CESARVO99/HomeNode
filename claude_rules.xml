@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  claude_rules.xml
+  ================
+  Reglas exportables de metodologia, estandares y scripts para proyectos IoT embebidos.
+  Este archivo puede importarse a cualquier proyecto para replicar la misma metodologia.
+
+  Version: 1.0.0
+  Fecha:   2026-03-13
+  Autor:   CESARVO99
+  Proyecto: HomeNode — Plataforma IoT domestica modular
+-->
+<claude_rules version="1.0.0">
+
+  <!-- ================================================================
+       SECCION 1: METODOLOGIA DE TRABAJO (WORKFLOW)
+       ================================================================ -->
+  <methodology>
+    <workflow>
+      <step order="1" id="requirements">
+        <name>Recopilacion de Requisitos</name>
+        <description>Preguntar al usuario que cambios/features implementar</description>
+        <actions>
+          <action>Preguntar al usuario la descripcion del trabajo</action>
+          <action>Ofrecer opciones cuando haya multiples enfoques</action>
+          <action>Documentar los requisitos en claude.md</action>
+          <action>Confirmar alcance antes de codificar</action>
+        </actions>
+        <rule>Siempre preguntar ante dudas y dar opciones al usuario</rule>
+      </step>
+
+      <step order="2" id="development">
+        <name>Desarrollo (Codificacion)</name>
+        <description>Implementar cambios siguiendo estandares del proyecto</description>
+        <actions>
+          <action>Seguir estandares de codigo existentes</action>
+          <action>Documentar con Doxygen todas las funciones nuevas</action>
+          <action>Adaptar codigo para unit tests (ifdef UNIT_TEST)</action>
+          <action>Mantener modularidad (1 modulo = 1 .cpp + 1 .h)</action>
+        </actions>
+      </step>
+
+      <step order="3" id="cleanup">
+        <name>Limpieza de Codigo</name>
+        <description>Eliminar codigo redundante y spaghetti</description>
+        <actions>
+          <action>Eliminar codigo redundante de src/</action>
+          <action>Eliminar variables, includes y defines no usados</action>
+          <action>Verificar que no queden TODO/FIXME sin justificacion</action>
+        </actions>
+      </step>
+
+      <step order="4" id="refactoring">
+        <name>Refactorizacion y Analisis Estatico</name>
+        <description>Refactorizar codigo basandose en resultados de analisis estatico y metricas de complejidad</description>
+        <actions>
+          <action>Ejecutar cppcheck para detectar errores, estilo y bugs potenciales</action>
+          <action>Corregir errores cppcheck: shiftTooManyBitsSigned, cstyleCast, constParameterPointer, variableScope</action>
+          <action>Reducir complejidad ciclomatica de funciones con CC mayor a 10</action>
+          <action>Extraer subfunciones para bloques de logica independiente</action>
+          <action>Usar early return en lugar de anidamiento profundo</action>
+          <action>Crear funciones helper static para validacion y conversion</action>
+          <action>Actualizar headers para que prototipos coincidan con firmas refactorizadas</action>
+          <action>Incrementar version en archivos modificados</action>
+        </actions>
+        <refactoring_targets>
+          <target type="cppcheck_error" name="shiftTooManyBitsSigned" fix="Reemplazar shift de bits en signed por comparacion directa"/>
+          <target type="cppcheck_style" name="cstyleCast" fix="Usar variable local tipada o static_cast"/>
+          <target type="cppcheck_style" name="constParameterPointer" fix="Anadir const a punteros que no se modifican"/>
+          <target type="cppcheck_style" name="variableScope" fix="Mover declaracion al scope mas reducido"/>
+          <target type="complexity" name="cc_above_10" fix="Extraer subfunciones y usar early return"/>
+        </refactoring_targets>
+        <rule>Cada refactorizacion debe seguirse de compilacion + tests para verificar que no se ha roto nada</rule>
+      </step>
+
+      <step order="5" id="compilation">
+        <name>Compilacion y Correccion</name>
+        <description>Compilar todos los entornos y corregir errores</description>
+        <actions>
+          <action>Compilar entorno de produccion: pio run -e nodemcu-32s</action>
+          <action>Compilar entorno de tests: pio test -e native</action>
+          <action>Corregir todos los errores y warnings</action>
+          <action>Iterar hasta compilacion limpia</action>
+        </actions>
+      </step>
+
+      <step order="6" id="qa">
+        <name>QA: Tests, Metricas y Analisis</name>
+        <description>Ejecutar suite completa de calidad</description>
+        <actions>
+          <action>Ejecutar python smrt_qa.py</action>
+          <action>Verificar criterios de aceptacion</action>
+          <action>Corregir fallos y re-ejecutar si necesario</action>
+        </actions>
+        <acceptance_criteria>
+          <criterion type="tests">100% de tests deben pasar</criterion>
+          <criterion type="analysis">0 errores en analisis estatico</criterion>
+          <criterion type="complexity">Complejidad ciclomatica por funcion menor o igual a 10</criterion>
+        </acceptance_criteria>
+      </step>
+
+      <step order="7" id="commit">
+        <name>Commit y Push</name>
+        <description>Subir cambios al repositorio con descripcion completa</description>
+        <actions>
+          <action>git add archivos especificos (no usar git add .)</action>
+          <action>Crear commit con descripcion detallada</action>
+          <action>Incluir resultados de QA en el mensaje</action>
+          <action>Push al repositorio remoto</action>
+        </actions>
+        <commit_format>
+          <template><![CDATA[
+<tipo>: <descripcion corta>
+
+Cambios realizados:
+- <detalle 1>
+- <detalle 2>
+
+Tests: XX/XX PASS
+Analisis: X errores, X warnings
+Metricas: XXXX LOC, XX funciones
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+          ]]></template>
+          <types>
+            <type name="feat">Nueva funcionalidad</type>
+            <type name="fix">Correccion de bug</type>
+            <type name="refactor">Refactorizacion de codigo</type>
+            <type name="test">Anadir o modificar tests</type>
+            <type name="docs">Documentacion</type>
+            <type name="style">Formato/estilo de codigo</type>
+            <type name="chore">Tareas de mantenimiento</type>
+            <type name="perf">Mejora de rendimiento</type>
+          </types>
+        </commit_format>
+      </step>
+
+      <step order="8" id="tools">
+        <name>Instalacion de Herramientas</name>
+        <description>Detectar e instalar herramientas necesarias</description>
+        <tools>
+          <tool name="PlatformIO" command="pip install platformio" check="pio --version"/>
+          <tool name="cppcheck" command="winget install cppcheck" check="cppcheck --version"/>
+          <tool name="GCC" command="winget install BrechtSanders.WinLibs.POSIX.UCRT" check="gcc --version"/>
+          <tool name="Python3" command="winget install Python.Python.3" check="python --version"/>
+          <tool name="Git" command="winget install Git.Git" check="git --version"/>
+        </tools>
+      </step>
+    </workflow>
+  </methodology>
+
+  <!-- ================================================================
+       SECCION 2: ESTANDARES DE CODIGO
+       ================================================================ -->
+  <coding_standards>
+    <naming_conventions>
+      <convention element="functions" format="camelCase" prefix="module">
+        <example>smrtTypeSetUnsigned()</example>
+      </convention>
+      <convention element="macros" format="UPPER_SNAKE_CASE" prefix="SMRT_">
+        <example>SMRT_TYPE_SWAP_16</example>
+      </convention>
+      <convention element="custom_types" format="camelCase" prefix="none">
+        <example>uint8, int32, bit</example>
+      </convention>
+      <convention element="local_variables" format="camelCase" prefix="none">
+        <example>strLen, pValue</example>
+      </convention>
+      <convention element="constants" format="UPPER_SNAKE_CASE" prefix="none">
+        <example>NFC_UID_MAX_SIZE</example>
+      </convention>
+      <convention element="source_files" format="snake_case" prefix="smrt_">
+        <example>smrt_mc_format.cpp</example>
+      </convention>
+      <convention element="header_files" format="snake_case" prefix="smrt_">
+        <example>smrt_mc_format.h</example>
+      </convention>
+      <convention element="test_files" format="snake_case" prefix="test_">
+        <example>test_smrt_mc_format.cpp</example>
+      </convention>
+    </naming_conventions>
+
+    <file_structure>
+      <directory name="include" purpose="Headers (.h)"/>
+      <directory name="include/core" purpose="Headers CORE de la plataforma"/>
+      <directory name="include/modules" purpose="Headers de modulos especificos"/>
+      <directory name="src" purpose="Source files (.cpp, .c)"/>
+      <directory name="src/core" purpose="Fuentes CORE de la plataforma"/>
+      <directory name="src/modules" purpose="Fuentes de modulos especificos"/>
+      <directory name="test/test_native" purpose="Unit tests nativos"/>
+      <directory name="lib" purpose="Librerias externas"/>
+      <directory name="data" purpose="Archivos SPIFFS/LittleFS"/>
+      <directory name="docs" purpose="Documentacion (requisitos, arquitectura)"/>
+      <directory name="reports" purpose="Reportes QA (en .gitignore)"/>
+    </file_structure>
+
+    <documentation format="doxygen">
+      <file_header><![CDATA[
+/**
+ * @file    nombre_archivo.h
+ * @brief   Descripcion breve del modulo
+ * @project HOMENODE
+ * @version X.Y.Z
+ */
+      ]]></file_header>
+      <function_header><![CDATA[
+/**
+ * @brief  Descripcion breve de la funcion
+ * @param  paramName  Descripcion del parametro
+ * @return Descripcion del valor de retorno
+ */
+      ]]></function_header>
+    </documentation>
+
+    <unit_test_guards>
+      <header_guard><![CDATA[
+#ifndef UNIT_TEST
+#define exclude_functionName
+#endif
+      ]]></header_guard>
+      <source_guard><![CDATA[
+#ifdef UNIT_TEST
+    #include "module.h"
+#else
+    #include "main_header.h"
+#endif
+      ]]></source_guard>
+      <test_include><![CDATA[
+#include <unity.h>
+#include "module.h"
+#include "../../src/core/module.cpp"
+      ]]></test_include>
+    </unit_test_guards>
+
+    <cpp_guards><![CDATA[
+#ifdef __cplusplus
+extern "C" {
+#endif
+// ... declaraciones ...
+#ifdef __cplusplus
+}
+#endif
+    ]]></cpp_guards>
+  </coding_standards>
+
+  <!-- ================================================================
+       SECCION 3: METRICAS Y ANALISIS
+       ================================================================ -->
+  <metrics>
+    <cyclomatic_complexity>
+      <description>CC = 1 + if + else_if + for + while + case + AND + OR + ternary + catch</description>
+      <thresholds>
+        <threshold level="simple" max="10" action="none"/>
+        <threshold level="moderate" max="20" action="review"/>
+        <threshold level="complex" max="999" action="refactor"/>
+      </thresholds>
+    </cyclomatic_complexity>
+
+    <code_quality>
+      <metric name="lines_per_function" max="50" description="Maximo lineas por funcion"/>
+      <metric name="comment_density" min="15" unit="percent" description="Minimo ratio comentarios/codigo"/>
+      <metric name="test_function_ratio" min="100" unit="percent" description="Minimo 1 test por funcion"/>
+      <metric name="static_errors" max="0" description="Cero errores en analisis estatico"/>
+      <metric name="test_pass_rate" min="100" unit="percent" description="Todos los tests deben pasar"/>
+    </code_quality>
+
+    <indicators>
+      <indicator name="if_statements" description="Sentencias if (decisiones)"/>
+      <indicator name="loops" description="Bucles for/while (iteraciones)"/>
+      <indicator name="switch_statements" description="Sentencias switch (alternativas)"/>
+      <indicator name="total_functions" description="Numero total de funciones"/>
+      <indicator name="total_lines" description="Lineas totales del proyecto"/>
+      <indicator name="doxygen_blocks" description="Bloques de documentacion Doxygen"/>
+      <indicator name="inline_comments" description="Comentarios inline en src/"/>
+    </indicators>
+  </metrics>
+
+  <!-- ================================================================
+       SECCION 4: HERRAMIENTAS DE ANALISIS
+       ================================================================ -->
+  <analysis_tools>
+    <tool name="cppcheck" type="static_analysis">
+      <command><![CDATA[cppcheck --enable=all --suppress=missingInclude --suppress=unknownMacro --std=c++11 -I include -I include/core -I include/modules src/ include/]]></command>
+      <purpose>Deteccion de bugs, estilo, rendimiento, portabilidad</purpose>
+      <severity_levels>
+        <level name="error" action="fix_required"/>
+        <level name="warning" action="review"/>
+        <level name="style" action="informational"/>
+        <level name="performance" action="review"/>
+        <level name="information" action="informational"/>
+      </severity_levels>
+    </tool>
+
+    <tool name="platformio_unity" type="unit_testing">
+      <command><![CDATA[pio test -e native -v]]></command>
+      <purpose>Tests unitarios nativos en PC sin hardware</purpose>
+      <framework>Unity</framework>
+      <environment>native</environment>
+    </tool>
+
+    <tool name="smrt_qa_py" type="automation">
+      <command><![CDATA[python smrt_qa.py]]></command>
+      <purpose>Automatizacion completa de QA</purpose>
+      <options>
+        <option flag="--tests" description="Solo tests unitarios"/>
+        <option flag="--analysis" description="Solo analisis estatico"/>
+        <option flag="--metrics" description="Solo metricas de codigo"/>
+        <option flag="--summary" description="Mostrar ultimo reporte"/>
+      </options>
+    </tool>
+
+    <tool name="gcc_warnings" type="compilation">
+      <flags>-Wall -Wextra</flags>
+      <purpose>Warnings exhaustivos del compilador</purpose>
+    </tool>
+  </analysis_tools>
+
+  <!-- ================================================================
+       SECCION 5: SCRIPTS Y AUTOMATIZACION
+       ================================================================ -->
+  <automation>
+    <script name="smrt_qa.py" language="python" min_version="3.6">
+      <description>Script de QA automatizado para tests, analisis y metricas</description>
+      <output_directory>reports/YYYY-MM-DD_HH-MM-SS/</output_directory>
+      <generated_files>
+        <file name="test_results.txt" description="Salida completa de pio test"/>
+        <file name="static_analysis.txt" description="Salida completa de cppcheck"/>
+        <file name="metrics.txt" description="Metricas de codigo detalladas"/>
+        <file name="summary.txt" description="Resumen consolidado de QA"/>
+        <file name="changelog.md" description="Registro de cambios realizados"/>
+      </generated_files>
+    </script>
+
+    <reports>
+      <location>reports/</location>
+      <gitignored>true</gitignored>
+      <structure>Subdirectorio por timestamp YYYY-MM-DD_HH-MM-SS</structure>
+      <changelog_format>markdown</changelog_format>
+    </reports>
+  </automation>
+
+  <!-- ================================================================
+       SECCION 6: REGLAS DE INTERACCION CON EL USUARIO
+       ================================================================ -->
+  <interaction_rules>
+    <rule id="ask_first">
+      <description>Siempre preguntar antes de asumir</description>
+      <when>Hay multiples enfoques posibles o requisitos ambiguos</when>
+      <action>Presentar opciones claras y dejar que el usuario elija</action>
+    </rule>
+
+    <rule id="offer_options">
+      <description>Dar opciones al usuario</description>
+      <when>Hay decisiones de diseno o implementacion</when>
+      <action>Presentar minimo 2 opciones con pros/contras</action>
+    </rule>
+
+    <rule id="report_progress">
+      <description>Reportar progreso de cada paso</description>
+      <when>Al completar cada paso del workflow</when>
+      <action>Mostrar estado y resultado antes de continuar</action>
+    </rule>
+
+    <rule id="show_errors">
+      <description>Mostrar errores completos</description>
+      <when>Ocurre un error de compilacion, test o analisis</when>
+      <action>Mostrar error, explicar causa, proponer soluciones</action>
+    </rule>
+
+    <rule id="confirm_destructive">
+      <description>Confirmar acciones destructivas</description>
+      <when>Se va a eliminar codigo, archivos o hacer cambios irreversibles</when>
+      <action>Preguntar explicitamente antes de proceder</action>
+    </rule>
+
+    <rule id="document_changes">
+      <description>Documentar todos los cambios</description>
+      <when>Al finalizar la sesion</when>
+      <action>Generar changelog y commit con descripcion completa</action>
+    </rule>
+  </interaction_rules>
+
+  <!-- ================================================================
+       SECCION 7: CONFIGURACION DEL ENTORNO
+       ================================================================ -->
+  <environment>
+    <platformio>
+      <common_esp32 name="env_common_esp32">
+        <platform>espressif32</platform>
+        <board>nodemcu-32s</board>
+        <framework>arduino</framework>
+        <monitor_speed>115200</monitor_speed>
+        <build_flags>-I include -I include/core -I include/modules -D SMRT_PLATFORM_HOMENODE -std=c++11</build_flags>
+      </common_esp32>
+      <production_env name="nodemcu-32s">
+        <extends>env_common_esp32</extends>
+        <upload_speed>115200</upload_speed>
+      </production_env>
+      <ota_env name="ota">
+        <extends>env_common_esp32</extends>
+        <upload_protocol>espota</upload_protocol>
+        <upload_port>192.168.1.100</upload_port>
+      </ota_env>
+      <test_env name="native">
+        <platform>native</platform>
+        <build_flags>-I include -I include/core -I include/modules -D UNIT_TEST -D SMRT_PLATFORM_HOMENODE</build_flags>
+        <build_src_filter>-&lt;*&gt;</build_src_filter>
+        <test_framework>unity</test_framework>
+      </test_env>
+    </platformio>
+
+    <gitignore>
+      <entry>.pio</entry>
+      <entry>.vscode/.browse.c_cpp.db*</entry>
+      <entry>.vscode/c_cpp_properties.json</entry>
+      <entry>.vscode/launch.json</entry>
+      <entry>.vscode/ipch</entry>
+      <entry>reports/</entry>
+    </gitignore>
+  </environment>
+
+</claude_rules>
