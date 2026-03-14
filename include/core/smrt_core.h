@@ -2,7 +2,7 @@
  * @file    smrt_core.h
  * @brief   Master umbrella header — includes all core platform headers
  * @project HOMENODE
- * @version 0.2.0
+ * @version 0.4.1
  *
  * All source files in src/core/ and src/modules/ should include this
  * single header instead of individual core headers.
@@ -36,6 +36,7 @@
 
 #ifndef UNIT_TEST
 #include "smrt_core_nvs.h"         /**< NVS persistence API */
+#include "smrt_core_auth.h"        /**< Authentication & rate limiting */
 #include "smrt_core_wifi.h"        /**< WiFi management */
 #include "smrt_core_ws.h"          /**< WebSocket server */
 #include "smrt_core_http.h"        /**< HTTP server */

@@ -2,7 +2,7 @@
  * @file    smrt_core_ota.cpp
  * @brief   OTA update implementation — ArduinoOTA + HTTP firmware upload
  * @project HOMENODE
- * @version 0.2.0
+ * @version 0.4.1
  */
 
 //-----------------------------------------------------------------------------
@@ -15,6 +15,24 @@
 // External global objects (defined in smrt_core_http.cpp)
 //-----------------------------------------------------------------------------
 extern AsyncWebServer smrt_server;
+
+//-----------------------------------------------------------------------------
+// HTTP Basic Auth helper
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief  Validates HTTP Basic Auth credentials on an OTA request.
+ * @param  request  Pointer to the incoming request
+ * @return true if authorized, false if rejected (401 sent)
+ */
+static bool smrt_ota_check_auth(AsyncWebServerRequest *request) {
+    if (!request->authenticate(SMRT_AUTH_OTA_USER, SMRT_AUTH_OTA_PASS)) {
+        request->requestAuthentication();
+        Serial.println("OTA Web: Unauthorized access attempt");
+        return false;
+    }
+    return true;
+}
 
 //-----------------------------------------------------------------------------
 // OTA upload HTML page (PROGMEM)
@@ -183,15 +201,17 @@ void smrt_ota_init(void) {
  * @return void
  */
 void smrt_ota_web_init(void) {
-    // Serve OTA upload page
+    // Serve OTA upload page (requires auth)
     smrt_server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (!smrt_ota_check_auth(request)) return;
         request->send_P(200, "text/html", smrt_ota_page);
     });
 
-    // Handle firmware upload
+    // Handle firmware upload (requires auth)
     smrt_server.on("/update", HTTP_POST,
         // Response callback (called after upload completes)
         [](AsyncWebServerRequest *request) {
+            if (!smrt_ota_check_auth(request)) return;
             bool success = !Update.hasError();
             AsyncWebServerResponse *response = request->beginResponse(
                 success ? 200 : 500,

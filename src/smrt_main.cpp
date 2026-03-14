@@ -2,7 +2,7 @@
  * @file    smrt_main.cpp
  * @brief   HomeNode entry point — simplified setup/loop with modular architecture
  * @project HOMENODE
- * @version 0.3.0
+ * @version 0.4.1
  *
  * The main file is intentionally minimal. All functionality is delegated to
  * core subsystems and registered modules:
@@ -57,10 +57,26 @@ static void smrt_register_modules(void) {
         extern const smrt_module_t smrt_mod_env;
         smrt_module_register(&smrt_mod_env);
     #endif
-    // #ifdef SMRT_MOD_SEC
-    //     extern const smrt_module_t smrt_mod_sec;
-    //     smrt_module_register(&smrt_mod_sec);
-    // #endif
+    #ifdef SMRT_MOD_RLY
+        extern const smrt_module_t smrt_mod_rly;
+        smrt_module_register(&smrt_mod_rly);
+    #endif
+    #ifdef SMRT_MOD_SEC
+        extern const smrt_module_t smrt_mod_sec;
+        smrt_module_register(&smrt_mod_sec);
+    #endif
+    #ifdef SMRT_MOD_PLG
+        extern const smrt_module_t smrt_mod_plg;
+        smrt_module_register(&smrt_mod_plg);
+    #endif
+    #ifdef SMRT_MOD_NRG
+        extern const smrt_module_t smrt_mod_nrg;
+        smrt_module_register(&smrt_mod_nrg);
+    #endif
+    #ifdef SMRT_MOD_ACC
+        extern const smrt_module_t smrt_mod_acc;
+        smrt_module_register(&smrt_mod_acc);
+    #endif
 
     Serial.println("Modules registered: " + String(smrt_module_count()));
 }

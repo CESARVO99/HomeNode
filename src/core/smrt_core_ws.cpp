@@ -1,8 +1,14 @@
 /**
  * @file    smrt_core_ws.cpp
- * @brief   WebSocket server with module dispatch and telemetry aggregation
+ * @brief   WebSocket server with authentication, rate limiting, module dispatch
  * @project HOMENODE
- * @version 0.2.0
+ * @version 0.4.1
+ *
+ * Security features (v0.4.1):
+ *   - WebSocket authentication via "auth" command (PIN-based)
+ *   - Read-only commands ("status") allowed without auth
+ *   - Write commands require authenticated session
+ *   - PIN rate limiting with lockout after N failed attempts
  */
 
 //-----------------------------------------------------------------------------
@@ -16,6 +22,45 @@
 //-----------------------------------------------------------------------------
 extern AsyncWebServer smrt_server;
 extern AsyncWebSocket smrt_ws;
+
+//-----------------------------------------------------------------------------
+// Active client tracking (for per-client message routing)
+//-----------------------------------------------------------------------------
+static uint32_t smrt_ws_active_client_id = 0;  /**< Client ID for current message */
+
+//-----------------------------------------------------------------------------
+// Auth response helpers
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief  Sends an auth response JSON to a specific client.
+ * @param  client_id  Target client ID
+ * @param  success    true if authenticated, false on error
+ * @param  message    Human-readable message
+ * @return void
+ */
+static void smrt_ws_send_auth_response(uint32_t client_id, bool success, const char *message) {
+    JsonDocument resp;
+    resp["auth_result"] = success;
+    resp["auth_msg"]    = message;
+    String respStr;
+    serializeJson(resp, respStr);
+    smrt_ws.text(client_id, respStr);
+}
+
+/**
+ * @brief  Sends an error JSON to a specific client.
+ * @param  client_id  Target client ID
+ * @param  message    Error message
+ * @return void
+ */
+static void smrt_ws_send_error(uint32_t client_id, const char *message) {
+    JsonDocument resp;
+    resp["error"] = message;
+    String respStr;
+    serializeJson(resp, respStr);
+    smrt_ws.text(client_id, respStr);
+}
 
 //-----------------------------------------------------------------------------
 // WiFi config response helper
@@ -37,25 +82,83 @@ static void smrt_ws_send_wifi_response(bool success, const char *message) {
 }
 
 //-----------------------------------------------------------------------------
+// Auth command handler
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief  Handles the "auth" command — validates PIN with rate limiting.
+ * @param  doc        Parsed JSON document with "pin" field
+ * @param  client_id  WebSocket client ID requesting auth
+ * @return void
+ */
+static void smrt_ws_handle_auth_cmd(JsonDocument &doc, uint32_t client_id) {
+    /* Check lockout first */
+    if (smrt_auth_pin_is_locked()) {
+        unsigned long remaining = smrt_auth_pin_lockout_remaining();
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Bloqueado. Reintenta en %lus", remaining);
+        smrt_ws_send_auth_response(client_id, false, msg);
+        return;
+    }
+
+    const char *pin = doc["pin"];
+    if (!pin || strcmp(pin, smrt_wifi_get_pin()) != 0) {
+        smrt_auth_pin_fail();
+        if (smrt_auth_pin_is_locked()) {
+            smrt_ws_send_auth_response(client_id, false,
+                "PIN incorrecto. Demasiados intentos, bloqueado 60s");
+        } else {
+            smrt_ws_send_auth_response(client_id, false, "PIN incorrecto");
+        }
+        Serial.printf("AUTH: Failed PIN attempt from client #%u\n", client_id);
+        return;
+    }
+
+    /* PIN correct — authenticate client */
+    smrt_auth_pin_reset();
+    smrt_auth_ws_login(client_id);
+    smrt_ws_send_auth_response(client_id, true, "Autenticado correctamente");
+    Serial.printf("AUTH: Client #%u authenticated\n", client_id);
+}
+
+//-----------------------------------------------------------------------------
 // Core command handlers
 //-----------------------------------------------------------------------------
 
 /**
  * @brief  Handles the "wifi" command — validates PIN, saves credentials, restarts.
+ *         Now includes rate limiting via smrt_auth_pin_* functions.
  * @param  doc  Parsed JSON document containing wifi command fields
  * @return void
  */
 static void smrt_ws_handle_wifi_cmd(JsonDocument &doc) {
+    /* Check lockout */
+    if (smrt_auth_pin_is_locked()) {
+        unsigned long remaining = smrt_auth_pin_lockout_remaining();
+        char msg[64];
+        snprintf(msg, sizeof(msg), "Bloqueado. Reintenta en %lus", remaining);
+        smrt_ws_send_wifi_response(false, msg);
+        return;
+    }
+
     const char *pin  = doc["pin"];
     const char *ssid = doc["ssid"];
     const char *pass = doc["pass"];
 
-    // Validate PIN
+    // Validate PIN with rate limiting
     if (!pin || strcmp(pin, smrt_wifi_get_pin()) != 0) {
-        smrt_ws_send_wifi_response(false, "PIN incorrecto");
+        smrt_auth_pin_fail();
+        if (smrt_auth_pin_is_locked()) {
+            smrt_ws_send_wifi_response(false,
+                "PIN incorrecto. Demasiados intentos, bloqueado 60s");
+        } else {
+            smrt_ws_send_wifi_response(false, "PIN incorrecto");
+        }
         Serial.println("WiFi config: Invalid PIN attempt");
         return;
     }
+
+    smrt_auth_pin_reset();
 
     // Validate SSID
     if (!ssid || strlen(ssid) == 0) {
@@ -84,29 +187,48 @@ static void smrt_ws_handle_wifi_cmd(JsonDocument &doc) {
 /**
  * @brief  Dispatches a parsed JSON command to core handlers or modules.
  *
- * Core commands: "status", "wifi"
- * Module commands: prefix_subcommand (e.g. "env_read") -> module dispatch
+ * Security policy:
+ *   - "status" is read-only and allowed without authentication
+ *   - "auth" always allowed (it IS the authentication mechanism)
+ *   - "wifi" has its own PIN validation (rate-limited)
+ *   - All other commands (module commands) require authenticated session
  *
- * @param  doc  Parsed JSON document with a "cmd" field
+ * @param  doc        Parsed JSON document with a "cmd" field
+ * @param  client_id  WebSocket client ID that sent the message
  * @return void
  */
-static void smrt_ws_dispatch_command(JsonDocument &doc) {
+static void smrt_ws_dispatch_command(JsonDocument &doc, uint32_t client_id) {
     const char *cmd = doc["cmd"];
     if (!cmd) {
         return;
     }
 
-    // Core commands
+    /* Always allowed: status (read-only telemetry) */
     if (strcmp(cmd, "status") == 0) {
         smrt_ws_send_status();
         return;
     }
+
+    /* Always allowed: auth (this IS the login mechanism) */
+    if (strcmp(cmd, "auth") == 0) {
+        smrt_ws_handle_auth_cmd(doc, client_id);
+        return;
+    }
+
+    /* WiFi has its own PIN check with rate limiting */
     if (strcmp(cmd, "wifi") == 0) {
         smrt_ws_handle_wifi_cmd(doc);
         return;
     }
 
-    // Module dispatch (prefix stripping)
+    /* All other commands require authentication */
+    if (!smrt_auth_ws_is_authenticated(client_id)) {
+        smrt_ws_send_error(client_id,
+            "No autenticado. Envia {\"cmd\":\"auth\",\"pin\":\"XXXX\"} primero");
+        return;
+    }
+
+    /* Module dispatch (prefix stripping) */
     smrt_module_dispatch(cmd, (void *)&doc, (void *)0);
 }
 
@@ -142,12 +264,14 @@ void smrt_ws_send_status(void) {
 /**
  * @brief  Handles incoming WebSocket messages.
  *         Validates frame completeness, parses JSON and dispatches commands.
- * @param  arg   Frame info pointer (AwsFrameInfo)
- * @param  data  Pointer to the received data buffer
- * @param  len   Length of the received data
+ * @param  arg        Frame info pointer (AwsFrameInfo)
+ * @param  data       Pointer to the received data buffer
+ * @param  len        Length of the received data
+ * @param  client_id  WebSocket client ID that sent the message
  * @return void
  */
-void smrt_ws_handle_message(void *arg, uint8_t *data, size_t len) {
+static void smrt_ws_handle_message_from(void *arg, uint8_t *data, size_t len,
+                                         uint32_t client_id) {
     AwsFrameInfo *info = (AwsFrameInfo *)arg;
 
     if (!(info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)) {
@@ -164,12 +288,24 @@ void smrt_ws_handle_message(void *arg, uint8_t *data, size_t len) {
         return;
     }
 
-    smrt_ws_dispatch_command(doc);
+    smrt_ws_dispatch_command(doc, client_id);
+}
+
+/**
+ * @brief  Legacy wrapper for handle_message (maintains header compatibility).
+ * @param  arg   Frame info pointer
+ * @param  data  Data buffer
+ * @param  len   Data length
+ * @return void
+ */
+void smrt_ws_handle_message(void *arg, uint8_t *data, size_t len) {
+    smrt_ws_handle_message_from(arg, data, len, smrt_ws_active_client_id);
 }
 
 /**
  * @brief  WebSocket event handler for connection/disconnection/data events.
  *         Sends initial status to newly connected clients.
+ *         Tracks/unracks authenticated clients on connect/disconnect.
  * @param  server  Pointer to the AsyncWebSocket server instance
  * @param  client  Pointer to the client that triggered the event
  * @param  type    Type of event
@@ -188,9 +324,11 @@ void smrt_ws_on_event(AsyncWebSocket *server, AsyncWebSocketClient *client,
             break;
         case WS_EVT_DISCONNECT:
             Serial.printf("WebSocket client #%u disconnected\n", client->id());
+            smrt_auth_ws_logout(client->id());
             break;
         case WS_EVT_DATA:
-            smrt_ws_handle_message(arg, data, len);
+            smrt_ws_active_client_id = client->id();
+            smrt_ws_handle_message_from(arg, data, len, client->id());
             break;
         case WS_EVT_PONG:
         case WS_EVT_ERROR:
@@ -203,6 +341,7 @@ void smrt_ws_on_event(AsyncWebSocket *server, AsyncWebSocketClient *client,
  * @return void
  */
 void smrt_ws_init(void) {
+    smrt_auth_init();
     smrt_ws.onEvent(smrt_ws_on_event);
     smrt_server.addHandler(&smrt_ws);
 }

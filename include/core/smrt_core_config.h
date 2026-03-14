@@ -2,7 +2,7 @@
  * @file    smrt_core_config.h
  * @brief   Platform configuration defines for HomeNode
  * @project HOMENODE
- * @version 0.3.0
+ * @version 0.4.1
  *
  * All compile-time constants for the HomeNode platform are centralized here.
  * Modules should NOT define their own network/timing constants — use these.
@@ -15,7 +15,7 @@
 // Platform identity
 //-----------------------------------------------------------------------------
 #define SMRT_PLATFORM_NAME          "HomeNode"      /**< Platform display name */
-#define SMRT_PLATFORM_VERSION       "0.3.0"         /**< Platform firmware version */
+#define SMRT_PLATFORM_VERSION       "0.4.1"         /**< Platform firmware version */
 
 //-----------------------------------------------------------------------------
 // Network — HTTP / WebSocket
@@ -51,7 +51,21 @@
 //-----------------------------------------------------------------------------
 #define SMRT_OTA_HOSTNAME           "homenode"      /**< mDNS hostname for OTA */
 #define SMRT_OTA_PORT               3232            /**< OTA upload port */
-#define SMRT_OTA_PASSWORD           ""              /**< OTA password (empty=none) */
+#define SMRT_OTA_PASSWORD           "hN!0t4$ecUr3"  /**< OTA password (change for each device) */
+
+//-----------------------------------------------------------------------------
+// Security — Authentication & rate limiting
+//-----------------------------------------------------------------------------
+#define SMRT_AUTH_MAX_WS_CLIENTS    8               /**< Max tracked WS client slots */
+#define SMRT_AUTH_PIN_MAX_ATTEMPTS  3               /**< Failed PIN attempts before lockout */
+#define SMRT_AUTH_PIN_LOCKOUT_MS    60000            /**< PIN lockout duration (60s) */
+#define SMRT_AUTH_OTA_USER          "admin"          /**< HTTP Basic Auth user for /update */
+#define SMRT_AUTH_OTA_PASS          "hN!0t4$ecUr3"  /**< HTTP Basic Auth password for /update */
+
+//-----------------------------------------------------------------------------
+// NVS write throttling
+//-----------------------------------------------------------------------------
+#define SMRT_NVS_WRITE_INTERVAL_MS  300000          /**< Min interval between NVS writes (5 min) */
 
 //-----------------------------------------------------------------------------
 // Timing
