@@ -2,7 +2,7 @@
  * @file    smrt_core_webui.h
  * @brief   Base HTML/CSS/JS web interface stored in PROGMEM
  * @project HOMENODE
- * @version 0.2.0
+ * @version 0.3.0
  *
  * This is the modular HomeNode dashboard. It provides:
  *   - Connection status card
@@ -140,8 +140,24 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 </div>
             </div>
         </div>
-        <!-- Module cards (populated by modules in later phases) -->
-        <div id="moduleCards"></div>
+        <!-- Module cards -->
+        <div id="moduleCards">
+            <!-- ENV module: Temperature & Humidity -->
+            <div class="card" id="cardEnv">
+                <h2>Ambiente</h2>
+                <div class="sys-grid">
+                    <div class="sys-item">
+                        <div class="sys-label">TEMPERATURA</div>
+                        <div id="envTemp" class="sys-value" style="font-size:1.4rem;">--.- &deg;C</div>
+                    </div>
+                    <div class="sys-item">
+                        <div class="sys-label">HUMEDAD</div>
+                        <div id="envHum" class="sys-value" style="font-size:1.4rem;">--.- %%</div>
+                    </div>
+                </div>
+                <div id="envStatus" style="font-size:0.75rem;color:#7F8C8D;margin-top:10px;">Sensor: ---</div>
+            </div>
+        </div>
         <!-- WiFi config -->
         <div class="card">
             <h2>Configuracion WiFi</h2>
@@ -171,7 +187,7 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
             <a href="/update" class="btn btn-settings" style="text-decoration:none;">Actualizar Firmware</a>
         </div>
     </div>
-    <div class="footer">HOMENODE &middot; IoT Modular Platform &middot; v0.2.0</div>
+    <div class="footer">HOMENODE &middot; IoT Modular Platform &middot; v0.3.0</div>
     <script>
         var gateway = 'ws://' + window.location.hostname + '/ws';
         var websocket = null;
@@ -207,6 +223,16 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 if (d.clients !== undefined) document.getElementById('sysClients').textContent = d.clients;
                 if (d.ssid) document.getElementById('sysSsid').textContent = d.ssid;
                 if (d.wifi_result !== undefined) showWifiMsg(d.wifi_result, d.wifi_msg || '');
+                // ENV module telemetry
+                if (d.modules && d.modules.env) {
+                    var env = d.modules.env;
+                    if (env.temperature !== undefined)
+                        document.getElementById('envTemp').textContent = env.temperature.toFixed(1) + ' \u00B0C';
+                    if (env.humidity !== undefined)
+                        document.getElementById('envHum').textContent = env.humidity.toFixed(1) + ' %%';
+                    if (env.ok !== undefined)
+                        document.getElementById('envStatus').textContent = env.ok ? 'Sensor: OK' : 'Sensor: Error';
+                }
             } catch (e) {}
         }
         function wsSend(obj) {
