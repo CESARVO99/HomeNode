@@ -457,7 +457,7 @@ static void rly_get_telemetry(void *data) {
 const smrt_module_t smrt_mod_rly = {
     "rly",                  /* id */
     "Relay Control",        /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     rly_init,               /* init */
     rly_loop,               /* loop */
     rly_ws_handler,         /* ws_handler */
@@ -469,7 +469,7 @@ const smrt_module_t smrt_mod_rly = {
 const smrt_module_t smrt_mod_rly = {
     "rly",                  /* id */
     "Relay Control",        /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     NULL,                   /* init */
     NULL,                   /* loop */
     NULL,                   /* ws_handler */

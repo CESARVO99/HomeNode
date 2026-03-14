@@ -2,7 +2,7 @@
  * @file    smrt_mod_acc_config.h
  * @brief   Configuration defines for the Access Control module
  * @project HOMENODE
- * @version 0.4.0
+ * @version 0.5.0
  *
  * SPI pin assignments for MFRC522, lock relay, UID storage, event log.
  * WARNING: GPIO2 (lock relay) shared with PLUG module relay.
@@ -48,5 +48,6 @@
 #define SMRT_ACC_NVS_KEY_UID_CNT    "uid_cnt"       /**< Authorized UID count */
 #define SMRT_ACC_NVS_KEY_UID_PFX    "uid_"          /**< UID prefix: uid_0..uid_19 */
 #define SMRT_ACC_NVS_KEY_PULSE      "pulse_ms"      /**< Pulse duration */
+#define SMRT_ACC_NVS_KEY_EVENTS     "events"        /**< Event log JSON blob */
 
 #endif // SMRT_MOD_ACC_CONFIG_H

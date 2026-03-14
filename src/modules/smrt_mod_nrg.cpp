@@ -611,7 +611,7 @@ static void nrg_get_telemetry(void *data) {
 const smrt_module_t smrt_mod_nrg = {
     "nrg",                  /* id */
     "Energy Monitor",       /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     nrg_init,               /* init */
     nrg_loop,               /* loop */
     nrg_ws_handler,         /* ws_handler */
@@ -623,7 +623,7 @@ const smrt_module_t smrt_mod_nrg = {
 const smrt_module_t smrt_mod_nrg = {
     "nrg",                  /* id */
     "Energy Monitor",       /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     NULL,                   /* init */
     NULL,                   /* loop */
     NULL,                   /* ws_handler */

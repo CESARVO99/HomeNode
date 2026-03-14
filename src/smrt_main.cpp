@@ -2,7 +2,7 @@
  * @file    smrt_main.cpp
  * @brief   HomeNode entry point — simplified setup/loop with modular architecture
  * @project HOMENODE
- * @version 0.4.1
+ * @version 0.5.0
  *
  * The main file is intentionally minimal. All functionality is delegated to
  * core subsystems and registered modules:

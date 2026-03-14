@@ -185,7 +185,7 @@ void test_descriptor_name(void) {
 }
 
 void test_descriptor_version(void) {
-    TEST_ASSERT_EQUAL_STRING("0.4.0", smrt_mod_rly.version);
+    TEST_ASSERT_EQUAL_STRING("0.5.0", smrt_mod_rly.version);
 }
 
 //=============================================================================

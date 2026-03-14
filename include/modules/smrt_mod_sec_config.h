@@ -2,7 +2,7 @@
  * @file    smrt_mod_sec_config.h
  * @brief   Configuration defines for the Security module
  * @project HOMENODE
- * @version 0.4.0
+ * @version 0.5.0
  *
  * Pin assignment, alarm states, timing and event log configuration.
  * WARNING: GPIO25 (buzzer) shared with RELAY module relay 3.
@@ -60,5 +60,6 @@
 #define SMRT_SEC_NVS_KEY_ARMED      "armed"         /**< Armed state persistence */
 #define SMRT_SEC_NVS_KEY_ENTRY_DLY  "entry_dly"     /**< Entry delay ms */
 #define SMRT_SEC_NVS_KEY_EXIT_DLY   "exit_dly"      /**< Exit delay ms */
+#define SMRT_SEC_NVS_KEY_EVENTS     "events"        /**< Event log JSON blob */
 
 #endif // SMRT_MOD_SEC_CONFIG_H

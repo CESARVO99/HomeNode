@@ -2,7 +2,7 @@
  * @file    smrt_mod_sec.cpp
  * @brief   Security module — PIR, reed switch, alarm state machine
  * @project HOMENODE
- * @version 0.4.0
+ * @version 0.5.0
  *
  * Implements the smrt_module_t interface for home security monitoring.
  * Hardware: PIR (GPIO12), Reed switch (GPIO13), Vibration (GPIO14), Buzzer (GPIO25).
@@ -44,10 +44,13 @@ static int          sec_event_count = 0;
 
 #ifndef UNIT_TEST
 static unsigned long sec_delay_start  = 0;
-static int           sec_pir_last     = 0;
-static int           sec_reed_last    = 0;
-static unsigned long sec_pir_debounce = 0;
+static int           sec_pir_last      = 0;
+static int           sec_reed_last     = 0;
+static int           sec_vibr_last     = 0;
+static unsigned long sec_pir_debounce  = 0;
 static unsigned long sec_reed_debounce = 0;
+static unsigned long sec_vibr_debounce = 0;
+static unsigned long sec_events_last_nvs_ms = 0;
 #endif
 
 //=============================================================================
@@ -232,6 +235,57 @@ void smrt_sec_set_exit_delay(unsigned long ms) {
 
 extern AsyncWebSocket smrt_ws;
 
+//-----------------------------------------------------------------------------
+// Event log NVS persistence
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief  Serializes event log to NVS as JSON blob.
+ * @return void
+ */
+static void sec_save_events(void) {
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    int i;
+    for (i = 0; i < sec_event_count; i++) {
+        unsigned long ts = 0;
+        const char *msg = smrt_sec_get_event(i, &ts);
+        if (msg) {
+            JsonObject ev = arr.add<JsonObject>();
+            ev["m"] = msg;
+            ev["t"] = ts;
+        }
+    }
+    String output;
+    serializeJson(doc, output);
+    smrt_nvs_set_string(SMRT_SEC_NVS_NAMESPACE, SMRT_SEC_NVS_KEY_EVENTS,
+                         output.c_str());
+}
+
+/**
+ * @brief  Restores event log from NVS JSON blob.
+ * @return void
+ */
+static void sec_load_events(void) {
+    char buf[1024];
+    if (!smrt_nvs_get_string(SMRT_SEC_NVS_NAMESPACE, SMRT_SEC_NVS_KEY_EVENTS,
+                              buf, sizeof(buf))) {
+        return;
+    }
+    JsonDocument doc;
+    if (deserializeJson(doc, buf) != DeserializationError::Ok) {
+        return;
+    }
+    JsonArray arr = doc.as<JsonArray>();
+    for (JsonObject ev : arr) {
+        const char *m = ev["m"];
+        unsigned long t = ev["t"];
+        if (m) {
+            smrt_sec_add_event(m, t);
+        }
+    }
+}
+
 /**
  * @brief  Returns state name for JSON and serial.
  * @param  state  Alarm state constant
@@ -275,6 +329,7 @@ static void sec_send_status(void) {
     resp["state"]       = sec_state_name(sec_alarm_state);
     resp["pir"]         = sec_pir_last;
     resp["reed"]        = sec_reed_last;
+    resp["vibration"]   = sec_vibr_last;
     resp["entry_delay"] = sec_entry_delay;
     resp["exit_delay"]  = sec_exit_delay;
     resp["events"]      = sec_event_count;
@@ -335,6 +390,13 @@ static void sec_process_event(int event) {
         break;
     }
 
+    /* Throttled NVS persistence of event log */
+    unsigned long now_save = millis();
+    if (now_save - sec_events_last_nvs_ms >= SMRT_NVS_WRITE_INTERVAL_MS) {
+        sec_events_last_nvs_ms = now_save;
+        sec_save_events();
+    }
+
     sec_send_status();
 }
 
@@ -372,6 +434,9 @@ static void sec_init(void) {
     bool was_armed = false;
     smrt_nvs_get_bool(SMRT_SEC_NVS_NAMESPACE, SMRT_SEC_NVS_KEY_ARMED,
                       &was_armed, false);
+    /* Restore event log from NVS */
+    sec_load_events();
+
     if (was_armed) {
         sec_alarm_state = SMRT_SEC_STATE_ARMED;
         smrt_sec_add_event("Rearmed after reboot", millis());
@@ -428,6 +493,16 @@ static void sec_loop(void) {
         sec_process_event(SMRT_SEC_EVT_DOOR_OPEN);
     }
     sec_reed_last = reed;
+
+    /* Vibration — active HIGH (shock = HIGH), debounced */
+    int vibr = digitalRead(SMRT_SEC_VIBR_PIN);
+    if (vibr && !sec_vibr_last && (now - sec_vibr_debounce >= SMRT_SEC_DEBOUNCE_MS)) {
+        sec_vibr_debounce = now;
+        smrt_sec_add_event("Vibracion detectada", now);
+        sec_send_alert("vibration");
+        sec_process_event(SMRT_SEC_EVT_VIBRATION);
+    }
+    sec_vibr_last = vibr;
 }
 
 //-----------------------------------------------------------------------------
@@ -535,6 +610,7 @@ static void sec_ws_handler(const char *cmd, void *doc, void *client) {
 
     if (strcmp(cmd, "clear_events") == 0) {
         smrt_sec_clear_events();
+        smrt_nvs_remove(SMRT_SEC_NVS_NAMESPACE, SMRT_SEC_NVS_KEY_EVENTS);
         sec_send_status();
         return;
     }
@@ -552,6 +628,7 @@ static void sec_get_telemetry(void *data) {
     obj["state"]       = sec_state_name(sec_alarm_state);
     obj["pir"]         = sec_pir_last;
     obj["reed"]        = sec_reed_last;
+    obj["vibration"]   = sec_vibr_last;
     obj["entry_delay"] = sec_entry_delay;
     obj["exit_delay"]  = sec_exit_delay;
     obj["events"]      = sec_event_count;
@@ -564,7 +641,7 @@ static void sec_get_telemetry(void *data) {
 const smrt_module_t smrt_mod_sec = {
     "sec",                  /* id */
     "Security",             /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     sec_init,               /* init */
     sec_loop,               /* loop */
     sec_ws_handler,         /* ws_handler */
@@ -576,7 +653,7 @@ const smrt_module_t smrt_mod_sec = {
 const smrt_module_t smrt_mod_sec = {
     "sec",                  /* id */
     "Security",             /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     NULL,                   /* init */
     NULL,                   /* loop */
     NULL,                   /* ws_handler */

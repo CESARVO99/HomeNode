@@ -2,7 +2,7 @@
  * @file    smrt_core.h
  * @brief   Master umbrella header — includes all core platform headers
  * @project HOMENODE
- * @version 0.4.1
+ * @version 0.5.0
  *
  * All source files in src/core/ and src/modules/ should include this
  * single header instead of individual core headers.

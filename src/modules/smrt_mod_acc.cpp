@@ -2,7 +2,7 @@
  * @file    smrt_mod_acc.cpp
  * @brief   Access Control module — NFC (MFRC522) + lock relay
  * @project HOMENODE
- * @version 0.4.0
+ * @version 0.5.0
  *
  * Implements the smrt_module_t interface for NFC-based access control.
  * Hardware: MFRC522 via SPI, lock relay on GPIO2.
@@ -57,6 +57,7 @@ static MFRC522       acc_rfid(SMRT_ACC_SPI_SS, SMRT_ACC_SPI_RST);
 static int           acc_lock_state    = 0;   /**< 0=locked, 1=unlocked */
 static unsigned long acc_pulse_start   = 0;
 static int           acc_pulsing       = 0;
+static unsigned long acc_events_last_nvs_ms = 0;
 #endif
 
 //=============================================================================
@@ -369,6 +370,57 @@ void smrt_acc_clear_events(void) {
 
 extern AsyncWebSocket smrt_ws;
 
+//-----------------------------------------------------------------------------
+// Event log NVS persistence
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief  Serializes event log to NVS as JSON blob.
+ * @return void
+ */
+static void acc_save_events(void) {
+    JsonDocument doc;
+    JsonArray arr = doc.to<JsonArray>();
+    int i;
+    for (i = 0; i < acc_event_count; i++) {
+        unsigned long ts = 0;
+        const char *msg = smrt_acc_get_event(i, &ts);
+        if (msg) {
+            JsonObject ev = arr.add<JsonObject>();
+            ev["m"] = msg;
+            ev["t"] = ts;
+        }
+    }
+    String output;
+    serializeJson(doc, output);
+    smrt_nvs_set_string(SMRT_ACC_NVS_NAMESPACE, SMRT_ACC_NVS_KEY_EVENTS,
+                         output.c_str());
+}
+
+/**
+ * @brief  Restores event log from NVS JSON blob.
+ * @return void
+ */
+static void acc_load_events(void) {
+    char buf[1536];
+    if (!smrt_nvs_get_string(SMRT_ACC_NVS_NAMESPACE, SMRT_ACC_NVS_KEY_EVENTS,
+                              buf, sizeof(buf))) {
+        return;
+    }
+    JsonDocument doc;
+    if (deserializeJson(doc, buf) != DeserializationError::Ok) {
+        return;
+    }
+    JsonArray arr = doc.as<JsonArray>();
+    for (JsonObject ev : arr) {
+        const char *m = ev["m"];
+        unsigned long t = ev["t"];
+        if (m) {
+            smrt_acc_add_event(m, t);
+        }
+    }
+}
+
 /**
  * @brief  Saves all UIDs to NVS.
  * @return void
@@ -465,6 +517,9 @@ static void acc_init(void) {
     /* Load UIDs */
     acc_load_uids();
 
+    /* Restore event log from NVS */
+    acc_load_events();
+
     Serial.println("[ACC] Module initialized (UIDs="
                    + String(acc_uid_count)
                    + ", pulse=" + String(acc_pulse_ms) + "ms)");
@@ -540,6 +595,13 @@ static void acc_loop(void) {
     }
 
     acc_rfid.PICC_HaltA();
+
+    /* Throttled NVS persistence of event log */
+    if (now - acc_events_last_nvs_ms >= SMRT_NVS_WRITE_INTERVAL_MS) {
+        acc_events_last_nvs_ms = now;
+        acc_save_events();
+    }
+
     acc_send_status();
 }
 
@@ -694,6 +756,13 @@ static void acc_ws_handler(const char *cmd, void *doc, void *client) {
         return;
     }
 
+    if (strcmp(cmd, "clear_events") == 0) {
+        smrt_acc_clear_events();
+        smrt_nvs_remove(SMRT_ACC_NVS_NAMESPACE, SMRT_ACC_NVS_KEY_EVENTS);
+        acc_send_status();
+        return;
+    }
+
     Serial.println("[ACC] Unknown sub-command: " + String(cmd));
 }
 
@@ -725,7 +794,7 @@ static void acc_get_telemetry(void *data) {
 const smrt_module_t smrt_mod_acc = {
     "acc",                  /* id */
     "Access Control",       /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     acc_init,               /* init */
     acc_loop,               /* loop */
     acc_ws_handler,         /* ws_handler */
@@ -737,7 +806,7 @@ const smrt_module_t smrt_mod_acc = {
 const smrt_module_t smrt_mod_acc = {
     "acc",                  /* id */
     "Access Control",       /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     NULL,                   /* init */
     NULL,                   /* loop */
     NULL,                   /* ws_handler */

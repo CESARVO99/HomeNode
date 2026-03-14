@@ -503,7 +503,7 @@ static void plg_get_telemetry(void *data) {
 const smrt_module_t smrt_mod_plg = {
     "plg",                  /* id */
     "Smart Plug",           /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     plg_init,               /* init */
     plg_loop,               /* loop */
     plg_ws_handler,         /* ws_handler */
@@ -515,7 +515,7 @@ const smrt_module_t smrt_mod_plg = {
 const smrt_module_t smrt_mod_plg = {
     "plg",                  /* id */
     "Smart Plug",           /* name */
-    "0.4.0",                /* version */
+    "0.5.0",                /* version */
     NULL,                   /* init */
     NULL,                   /* loop */
     NULL,                   /* ws_handler */
