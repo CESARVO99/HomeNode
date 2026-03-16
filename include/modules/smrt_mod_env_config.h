@@ -2,7 +2,7 @@
  * @file    smrt_mod_env_config.h
  * @brief   Configuration defines for the Environmental module (DHT22)
  * @project HOMENODE
- * @version 0.3.0
+ * @version 0.7.0
  *
  * Pin assignment, sensor type and timing constants for smrt_mod_env.
  * Refer to docs/requirements.md section 4.4 for the pin map.
@@ -23,6 +23,8 @@
 #define SMRT_ENV_READ_INTERVAL_MS   5000    /**< Default sensor read interval (ms) */
 #define SMRT_ENV_READ_MIN_MS        2000    /**< Minimum read interval (DHT22 limit) */
 #define SMRT_ENV_READ_MAX_MS        60000   /**< Maximum read interval (1 minute) */
+#define SMRT_ENV_READ_RETRIES       3       /**< Retry attempts on sensor read failure */
+#define SMRT_ENV_RETRY_DELAY_MS     50      /**< Delay between read retries (ms) */
 
 //-----------------------------------------------------------------------------
 // Calibration offsets (additive correction)

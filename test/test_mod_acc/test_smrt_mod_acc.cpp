@@ -2,7 +2,7 @@
  * @file    test_smrt_mod_acc.cpp
  * @brief   Unit tests for smrt_mod_acc — UID management, validation, conversion, events
  * @project HOMENODE
- * @version 0.4.0
+ * @version 0.7.0
  *
  * Tests the pure-logic parts of the Access Control module:
  *   - Pulse validation
@@ -257,7 +257,7 @@ void test_descriptor_name(void) {
 }
 
 void test_descriptor_version(void) {
-    TEST_ASSERT_EQUAL_STRING("0.5.0", smrt_mod_acc.version);
+    TEST_ASSERT_EQUAL_STRING("0.7.0", smrt_mod_acc.version);
 }
 
 //=============================================================================
@@ -275,6 +275,41 @@ void test_find_acc_after_register(void) {
     const smrt_module_t *found = smrt_module_find("acc");
     TEST_ASSERT_NOT_NULL(found);
     TEST_ASSERT_EQUAL_STRING("Access Control", found->name);
+}
+
+//=============================================================================
+// Test: lockout validation
+//=============================================================================
+
+void test_lockout_attempts_valid(void) {
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_attempts(1));
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_attempts(5));
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_attempts(100));
+}
+
+void test_lockout_attempts_invalid(void) {
+    TEST_ASSERT_EQUAL(0, smrt_acc_validate_lockout_attempts(0));
+    TEST_ASSERT_EQUAL(0, smrt_acc_validate_lockout_attempts(-1));
+    TEST_ASSERT_EQUAL(0, smrt_acc_validate_lockout_attempts(101));
+}
+
+void test_lockout_ms_valid(void) {
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_ms(10000));
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_ms(300000));
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_ms(1800000));
+}
+
+void test_lockout_ms_invalid(void) {
+    TEST_ASSERT_EQUAL(0, smrt_acc_validate_lockout_ms(9999));
+    TEST_ASSERT_EQUAL(0, smrt_acc_validate_lockout_ms(0));
+    TEST_ASSERT_EQUAL(0, smrt_acc_validate_lockout_ms(1800001));
+}
+
+void test_lockout_config_defaults(void) {
+    TEST_ASSERT_EQUAL(5, SMRT_ACC_MAX_FAILED_ATTEMPTS);
+    TEST_ASSERT_EQUAL(300000, SMRT_ACC_LOCKOUT_MS);
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_attempts(SMRT_ACC_MAX_FAILED_ATTEMPTS));
+    TEST_ASSERT_EQUAL(1, smrt_acc_validate_lockout_ms(SMRT_ACC_LOCKOUT_MS));
 }
 
 //=============================================================================
@@ -364,6 +399,13 @@ int main(int argc, char **argv) {
     /* Registration */
     RUN_TEST(test_register_acc_module);
     RUN_TEST(test_find_acc_after_register);
+
+    /* Lockout validation */
+    RUN_TEST(test_lockout_attempts_valid);
+    RUN_TEST(test_lockout_attempts_invalid);
+    RUN_TEST(test_lockout_ms_valid);
+    RUN_TEST(test_lockout_ms_invalid);
+    RUN_TEST(test_lockout_config_defaults);
 
     /* Config defines */
     RUN_TEST(test_config_spi_ss_pin);

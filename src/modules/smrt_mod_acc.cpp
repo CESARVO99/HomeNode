@@ -2,7 +2,7 @@
  * @file    smrt_mod_acc.cpp
  * @brief   Access Control module — NFC (MFRC522) + lock relay
  * @project HOMENODE
- * @version 0.5.0
+ * @version 0.7.0
  *
  * Implements the smrt_module_t interface for NFC-based access control.
  * Hardware: MFRC522 via SPI, lock relay on GPIO2.
@@ -58,6 +58,8 @@ static int           acc_lock_state    = 0;   /**< 0=locked, 1=unlocked */
 static unsigned long acc_pulse_start   = 0;
 static int           acc_pulsing       = 0;
 static unsigned long acc_events_last_nvs_ms = 0;
+static int           acc_failed_count  = 0;    /**< Consecutive denied NFC reads */
+static unsigned long acc_lockout_start = 0;    /**< Lockout start timestamp */
 #endif
 
 //=============================================================================
@@ -74,6 +76,24 @@ int smrt_acc_validate_pulse(unsigned long ms) {
         return 1;
     }
     return 0;
+}
+
+/**
+ * @brief  Validates lockout attempt count (1..100).
+ * @param  attempts  Max failed attempts
+ * @return 1 valid, 0 invalid
+ */
+int smrt_acc_validate_lockout_attempts(int attempts) {
+    return (attempts >= 1 && attempts <= 100) ? 1 : 0;
+}
+
+/**
+ * @brief  Validates lockout duration (10s..30min).
+ * @param  ms  Lockout duration in milliseconds
+ * @return 1 valid, 0 invalid
+ */
+int smrt_acc_validate_lockout_ms(unsigned long ms) {
+    return (ms >= 10000 && ms <= 1800000) ? 1 : 0;
 }
 
 /**
@@ -544,6 +564,16 @@ static void acc_loop(void) {
         return;
     }
 
+    /* Check NFC lockout */
+    if (acc_failed_count >= SMRT_ACC_MAX_FAILED_ATTEMPTS) {
+        if (now - acc_lockout_start < SMRT_ACC_LOCKOUT_MS) {
+            return;
+        }
+        acc_failed_count = 0;
+        acc_lockout_start = 0;
+        Serial.println("[ACC] Lockout expired, accepting cards again");
+    }
+
     /* Poll NFC reader */
     if (!acc_rfid.PICC_IsNewCardPresent()) {
         return;
@@ -559,6 +589,8 @@ static void acc_loop(void) {
 
     /* Check authorization */
     if (smrt_acc_uid_is_authorized(uid_str)) {
+        /* Reset failed counter on success */
+        acc_failed_count = 0;
         /* Unlock */
         acc_lock_state = 1;
         acc_pulsing = 1;
@@ -579,6 +611,13 @@ static void acc_loop(void) {
         serializeJson(resp, output);
         smrt_ws.textAll(output);
     } else {
+        /* Track failed attempts for lockout */
+        acc_failed_count++;
+        if (acc_failed_count >= SMRT_ACC_MAX_FAILED_ATTEMPTS) {
+            acc_lockout_start = now;
+            Serial.println("[ACC] Lockout activated after failed attempts");
+        }
+
         char evt_msg[SMRT_ACC_EVENT_MSG_LEN];
         snprintf(evt_msg, sizeof(evt_msg), "DENIED: %s", uid_str);
         smrt_acc_add_event(evt_msg, now);
@@ -777,6 +816,8 @@ static void acc_get_telemetry(void *data) {
     obj["uids"]     = acc_uid_count;
     obj["pulse_ms"] = acc_pulse_ms;
     obj["events"]   = acc_event_count;
+    obj["lockout"]  = (acc_failed_count >= SMRT_ACC_MAX_FAILED_ATTEMPTS &&
+                       (millis() - acc_lockout_start < SMRT_ACC_LOCKOUT_MS));
 
     if (acc_event_count > 0) {
         unsigned long ts = 0;
@@ -794,7 +835,7 @@ static void acc_get_telemetry(void *data) {
 const smrt_module_t smrt_mod_acc = {
     "acc",                  /* id */
     "Access Control",       /* name */
-    "0.5.0",                /* version */
+    "0.7.0",                /* version */
     acc_init,               /* init */
     acc_loop,               /* loop */
     acc_ws_handler,         /* ws_handler */
@@ -806,7 +847,7 @@ const smrt_module_t smrt_mod_acc = {
 const smrt_module_t smrt_mod_acc = {
     "acc",                  /* id */
     "Access Control",       /* name */
-    "0.5.0",                /* version */
+    "0.7.0",                /* version */
     NULL,                   /* init */
     NULL,                   /* loop */
     NULL,                   /* ws_handler */

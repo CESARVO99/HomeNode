@@ -2,7 +2,7 @@
  * @file    smrt_core_auth.cpp
  * @brief   Authentication, rate limiting and WebSocket session management
  * @project HOMENODE
- * @version 0.6.0
+ * @version 0.7.0
  */
 
 //-----------------------------------------------------------------------------
@@ -40,7 +40,7 @@ void smrt_auth_init(void) {
     smrt_auth_client_count = 0;
     smrt_pin_fail_count = 0;
     smrt_pin_lockout_start = 0;
-    Serial.println("Auth subsystem initialized");
+    SMRT_DEBUG_LOG("Auth subsystem initialized");
 }
 
 //-----------------------------------------------------------------------------
@@ -133,8 +133,8 @@ void smrt_auth_pin_fail(void) {
     smrt_pin_fail_count++;
     if (smrt_pin_fail_count >= SMRT_AUTH_PIN_MAX_ATTEMPTS) {
         smrt_pin_lockout_start = millis();
-        Serial.printf("AUTH: PIN locked out for %lus after %d failed attempts\n",
-                      SMRT_AUTH_PIN_LOCKOUT_MS / 1000, smrt_pin_fail_count);
+        SMRT_DEBUG_PRINTF("AUTH: PIN locked out for %lus after %d failed attempts\n",
+                          SMRT_AUTH_PIN_LOCKOUT_MS / 1000, smrt_pin_fail_count);
     }
 }
 
@@ -190,8 +190,8 @@ void smrt_auth_ws_cleanup_expired(void) {
     int i = 0;
     while (i < smrt_auth_client_count) {
         if (now - smrt_auth_timestamps[i] >= SMRT_AUTH_SESSION_TIMEOUT_MS) {
-            Serial.printf("AUTH: Session expired for client #%u\n",
-                          smrt_auth_clients[i]);
+            SMRT_DEBUG_PRINTF("AUTH: Session expired for client #%u\n",
+                              smrt_auth_clients[i]);
             /* Shift remaining entries */
             for (int j = i; j < smrt_auth_client_count - 1; j++) {
                 smrt_auth_clients[j] = smrt_auth_clients[j + 1];

@@ -2,7 +2,7 @@
  * @file    smrt_core_auth.h
  * @brief   Authentication, rate limiting, session timeout and WS management
  * @project HOMENODE
- * @version 0.6.0
+ * @version 0.7.0
  *
  * Provides:
  *   - WebSocket client authentication tracking (per client ID)

@@ -2,7 +2,7 @@
  * @file    smrt_main.cpp
  * @brief   HomeNode entry point — simplified setup/loop with modular architecture
  * @project HOMENODE
- * @version 0.6.0
+ * @version 0.7.0
  *
  * The main file is intentionally minimal. All functionality is delegated to
  * core subsystems and registered modules:
@@ -35,6 +35,13 @@ extern AsyncWebSocket smrt_ws;
 // Telemetry timing
 //-----------------------------------------------------------------------------
 static unsigned long smrt_last_status_ms = 0;
+
+//-----------------------------------------------------------------------------
+// LED status blink (only when GPIO2 is not used by ACC lock relay)
+//-----------------------------------------------------------------------------
+#ifndef SMRT_MOD_ACC
+static unsigned long smrt_led_last_ms = 0;
+#endif
 
 //-----------------------------------------------------------------------------
 // Module registration (conditional compilation)
@@ -148,6 +155,19 @@ void loop() {
         smrt_last_status_ms = now;
         smrt_ws_send_status();
     }
+
+    // LED status blink (GPIO2 only if ACC module is not compiled)
+    #ifndef SMRT_MOD_ACC
+    {
+        unsigned long led_interval = smrt_wifi_is_ap_mode()
+                                     ? SMRT_LED_BLINK_AP_MS
+                                     : SMRT_LED_BLINK_NORMAL_MS;
+        if (now - smrt_led_last_ms >= led_interval) {
+            smrt_led_last_ms = now;
+            smrt_gpio_toggle_state(SMRT_LED_BUILTIN);
+        }
+    }
+    #endif
 
     delay(SMRT_LOOP_DELAY_MS);
 }

@@ -1,9 +1,9 @@
 # HomeNode — Firmware Architecture
 
 > **Project:** HomeNode — Modular Domestic IoT Platform
-> **Version:** 0.2.0
-> **Date:** 2026-03-14
-> **Phase:** FASE 2 — Firmware Modular Architecture
+> **Version:** 0.7.0
+> **Date:** 2026-03-16
+> **Phase:** FASE 7 — Security P2 + Features + Documentation
 
 ---
 
@@ -28,10 +28,11 @@
 |                   LAYER 2: CORE PLATFORM SERVICES                    |
 |                                                                      |
 |  smrt_core_module  Module registry, dispatch, lifecycle              |
-|  smrt_core_wifi    WiFi STA connection, credentials (NVS)           |
+|  smrt_core_wifi    WiFi STA + AP fallback, credentials (NVS)        |
 |  smrt_core_ws      WebSocket server, JSON protocol, telemetry       |
 |  smrt_core_http    AsyncWebServer + route registration              |
-|  smrt_core_ota     ArduinoOTA + HTTP firmware upload                |
+|  smrt_core_ota     ArduinoOTA + HTTP firmware upload (auth)         |
+|  smrt_core_auth    WS session auth, PIN rate limiting, timeout      |
 |  smrt_core_nvs     Generic NVS persistence (Preferences API)        |
 |  smrt_core_config  All #define constants (pins, timings, sizes)     |
 |  smrt_core_webui   Embedded HTML/CSS/JS dashboard (PROGMEM)         |
@@ -298,10 +299,11 @@ HomeNode/
 │       ├── smrt_mc_gpio.cpp         GPIO init/set/clear/toggle
 │       ├── smrt_core_module.cpp     Module registry and dispatch engine
 │       ├── smrt_core_nvs.cpp        NVS get/set over Preferences API
-│       ├── smrt_core_wifi.cpp       WiFi connection and credential mgmt
+│       ├── smrt_core_wifi.cpp       WiFi STA + AP fallback, hostname
 │       ├── smrt_core_ws.cpp         WebSocket events, dispatch, telemetry
+│       ├── smrt_core_auth.cpp       WS session auth, PIN rate limiting
 │       ├── smrt_core_http.cpp       Server + route registration
-│       └── smrt_core_ota.cpp        ArduinoOTA + HTTP upload
+│       └── smrt_core_ota.cpp        ArduinoOTA + HTTP upload (auth)
 │
 ├── test/
 │   ├── test_mc_format/
@@ -358,9 +360,10 @@ pio test -e native
 
 | Command | Direction | Description |
 |---------|-----------|-------------|
-| `status` | Client -> Server | Request status broadcast |
-| `wifi` | Client -> Server | Update WiFi credentials |
-| `pin` | Client -> Server | Update access PIN |
+| `status` | Client -> Server | Request status broadcast (no auth) |
+| `auth` | Client -> Server | Authenticate with PIN |
+| `wifi` | Client -> Server | Update WiFi credentials (own PIN check) |
+| `set_hostname` | Client -> Server | Change mDNS hostname (requires auth) |
 
 ### Module Commands (dispatched to modules)
 
@@ -447,4 +450,4 @@ test/test_native/test_smrt_mod_env.cpp
 
 ---
 
-*Document generated during FASE 2 implementation. Next phase: FASE 3 — First module implementation (smrt_mod_env).*
+*Document generated during FASE 2. Updated through FASE 7 (v0.7.0) — Security P2, Features, Documentation.*

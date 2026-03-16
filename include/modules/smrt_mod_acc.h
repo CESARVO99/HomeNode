@@ -2,7 +2,7 @@
  * @file    smrt_mod_acc.h
  * @brief   Access Control module — NFC (MFRC522) + lock relay
  * @project HOMENODE
- * @version 0.4.0
+ * @version 0.7.0
  *
  * NFC-based access control with MFRC522 reader via SPI.
  * Stores up to 20 authorized UIDs. Lock relay pulsed on authorized read.
@@ -48,6 +48,20 @@ extern const smrt_module_t smrt_mod_acc;
  * @return 1 valid, 0 invalid
  */
 int smrt_acc_validate_pulse(unsigned long ms);
+
+/**
+ * @brief  Validates lockout attempt count (1..100).
+ * @param  attempts  Max failed attempts before lockout
+ * @return 1 valid, 0 invalid
+ */
+int smrt_acc_validate_lockout_attempts(int attempts);
+
+/**
+ * @brief  Validates lockout duration (10s..30min).
+ * @param  ms  Lockout duration in milliseconds
+ * @return 1 valid, 0 invalid
+ */
+int smrt_acc_validate_lockout_ms(unsigned long ms);
 
 /**
  * @brief  Validates UID string format ("XX:XX:XX:XX" hex pairs).

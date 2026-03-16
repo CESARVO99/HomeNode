@@ -2,7 +2,7 @@
  * @file    smrt_mod_acc_config.h
  * @brief   Configuration defines for the Access Control module
  * @project HOMENODE
- * @version 0.5.0
+ * @version 0.7.0
  *
  * SPI pin assignments for MFRC522, lock relay, UID storage, event log.
  * WARNING: GPIO2 (lock relay) shared with PLUG module relay.
@@ -34,6 +34,12 @@
 #define SMRT_ACC_MAX_UIDS           20      /**< Maximum authorized UIDs */
 #define SMRT_ACC_UID_MAX_BYTES      10      /**< Maximum bytes per UID */
 #define SMRT_ACC_UID_STR_LEN        30      /**< Max UID string "XX:XX:...:XX" */
+
+//-----------------------------------------------------------------------------
+// NFC lockout (anti-brute-force)
+//-----------------------------------------------------------------------------
+#define SMRT_ACC_MAX_FAILED_ATTEMPTS 5      /**< Failed NFC reads before lockout */
+#define SMRT_ACC_LOCKOUT_MS         300000  /**< Lockout duration (5 minutes) */
 
 //-----------------------------------------------------------------------------
 // Event log

@@ -1,7 +1,7 @@
-# HomeNode v0.4.0 — Guia de Usuario
+# HomeNode v0.7.0 — Guia de Usuario
 
 > **Plataforma IoT domestica modular para ESP32**
-> Fecha: 2026-03-14 | Version: 0.4.0
+> Fecha: 2026-03-16 | Version: 0.7.0
 
 ---
 
@@ -268,8 +268,10 @@ Todos los mensajes son **JSON**. El campo `"cmd"` indica el comando:
 
 | Comando | Descripcion | Ejemplo |
 |---------|------------|---------|
-| `status` | Solicitar telemetria completa | `{"cmd": "status"}` |
-| `wifi` | Cambiar credenciales WiFi | `{"cmd": "wifi", "pin": "1234", "ssid": "MiRed", "pass": "MiPass"}` |
+| `status` | Solicitar telemetria completa (sin auth) | `{"cmd": "status"}` |
+| `auth` | Autenticarse con PIN | `{"cmd": "auth", "pin": "1234"}` |
+| `wifi` | Cambiar credenciales WiFi (PIN propio) | `{"cmd": "wifi", "pin": "1234", "ssid": "MiRed", "pass": "MiPass"}` |
+| `set_hostname` | Cambiar hostname mDNS (requiere auth) | `{"cmd": "set_hostname", "hostname": "mi-nodo"}` |
 
 ### Comandos de modulo
 
@@ -292,6 +294,8 @@ El sistema de dispatch extrae el prefijo del ID del modulo, busca el modulo regi
   "ip": "192.168.1.100",
   "clients": 2,
   "ssid": "MiRed",
+  "ap_mode": false,
+  "version": "0.7.0",
   "modules": {
     "env": { "temperature": 24.5, "humidity": 55.2, "ok": 1 },
     "rly": { "count": 2, "states": [1, 0], "names": ["Luz", "Bomba"], "pulse_ms": 3000 },
@@ -306,7 +310,7 @@ El sistema de dispatch extrae el prefijo del ID del modulo, busca el modulo regi
 
 ### Descripcion
 
-Monitorea temperatura y humedad ambiental usando un sensor DHT22/AM2302.
+Monitorea temperatura y humedad ambiental usando un sensor DHT22/AM2302. Incluye reintentos automaticos (3 intentos con 50ms entre cada uno) para tolerar fallos transitorios del sensor.
 
 ### Hardware
 
@@ -742,15 +746,20 @@ Soporta mayusculas y minusculas: `"ab:cd:ef:01"` es equivalente a `"AB:CD:EF:01"
 }
 ```
 
+### Lockout anti-brute-force
+
+Tras 5 intentos de acceso denegado consecutivos, el lector NFC se bloquea durante 5 minutos. Un acceso autorizado resetea el contador. El estado de lockout se reporta en la telemetria (`"lockout": true/false`).
+
 ### Flujo de operacion
 
 1. El lector MFRC522 detecta una tarjeta NFC
-2. Lee el UID de la tarjeta
-3. Convierte los bytes a formato string (`"XX:XX:XX:XX"`)
-4. Busca el UID en la lista de autorizados
-5. **Si autorizado:** Activa el rele de cerradura por `pulse_ms` milisegundos, registra evento "Acceso concedido"
-6. **Si no autorizado:** Registra evento "Acceso denegado"
-7. Espera a que la tarjeta sea retirada antes de leer otra
+2. Verifica que no haya lockout activo
+3. Lee el UID de la tarjeta
+4. Convierte los bytes a formato string (`"XX:XX:XX:XX"`)
+5. Busca el UID en la lista de autorizados
+6. **Si autorizado:** Activa rele por `pulse_ms` ms, resetea contador de fallos, registra evento
+7. **Si no autorizado:** Incrementa contador de fallos, registra evento. Si alcanza 5 fallos, activa lockout
+8. Espera a que la tarjeta sea retirada antes de leer otra
 
 ### Configuracion
 
@@ -824,16 +833,86 @@ Configuracion en `platformio.ini`:
 ### Via HTTP (navegador)
 
 1. Acceder a `http://192.168.1.100/update`
-2. Seleccionar el archivo `.bin` (ubicacion tipica: `.pio/build/nodemcu-32s/firmware.bin`)
-3. Click en "Subir Firmware"
-4. Esperar a que la barra de progreso llegue al 100%
-5. El dispositivo se reinicia automaticamente
-
-> **NOTA:** La actualizacion HTTP actualmente no requiere autenticacion. Ver la auditoria de seguridad para recomendaciones.
+2. Introducir credenciales HTTP Basic Auth (`admin` / password OTA)
+3. Seleccionar el archivo `.bin` (ubicacion tipica: `.pio/build/nodemcu-32s/firmware.bin`)
+4. Click en "Subir Firmware"
+5. Esperar a que la barra de progreso llegue al 100%
+6. El dispositivo se reinicia automaticamente
 
 ---
 
-## 15. Desarrollo y Tests
+## 15. Seguridad
+
+### Autenticacion WebSocket (PIN)
+
+Los comandos de escritura requieren autenticacion previa via PIN:
+
+```json
+{"cmd": "auth", "pin": "1234"}
+```
+
+- Comandos de lectura (`status`) permitidos sin auth
+- Comandos de escritura requieren sesion autenticada
+- Rate limiting: 3 intentos fallidos activan lockout de 60 segundos
+
+### Session timeout
+
+Las sesiones WebSocket autenticadas expiran tras 10 minutos de inactividad. Cada comando enviado reinicia el temporizador.
+
+### Validacion de IP local
+
+Solo se aceptan conexiones WebSocket desde redes privadas (RFC1918):
+- 192.168.x.x, 10.x.x.x, 172.16-31.x.x, 127.x.x.x
+
+Conexiones desde IPs publicas son rechazadas automaticamente.
+
+### HTTP Basic Auth en OTA
+
+El endpoint `/update` requiere autenticacion HTTP Basic Auth. Credenciales configurables en `smrt_core_config.h`.
+
+### Debug en produccion
+
+Los logs sensibles (credenciales, PIINs, client IDs) solo se imprimen si el firmware se compila con `-D SMRT_DEBUG`. El entorno de produccion (OTA) no incluye este flag.
+
+### mDNS hostname configurable
+
+El hostname mDNS se puede personalizar via WebSocket (requiere auth):
+
+```json
+{"cmd": "set_hostname", "hostname": "mi-homenode"}
+```
+
+El hostname se persiste en NVS y se aplica tras reinicio.
+
+---
+
+## 16. Modo AP de emergencia
+
+### Cuando se activa
+
+Si el ESP32 no puede conectar a la red WiFi configurada en 15 segundos, activa automaticamente un punto de acceso (AP) para permitir reconfiguracion.
+
+### Como conectarse
+
+1. Buscar la red WiFi: **HomeNode-Setup**
+2. Conectar con password: **homenode123**
+3. Abrir navegador: `http://192.168.4.1`
+4. Usar la tarjeta "Configuracion WiFi" para introducir nuevas credenciales
+5. El dispositivo se reinicia y conecta a la nueva red
+
+### Indicador visual
+
+El LED integrado (GPIO2) parpadea rapidamente (cada 500ms) en modo AP, y lentamente (cada 5s) en operacion normal. Solo activo si el modulo ACC no esta compilado (GPIO2 compartido con cerradura).
+
+---
+
+## 17. Watchdog
+
+El dispositivo incluye un watchdog de 30 segundos. Si el loop principal se cuelga (no responde en 30s), el ESP32 se reinicia automaticamente.
+
+---
+
+## 18. Desarrollo y Tests
 
 ### Estructura del proyecto
 
@@ -945,8 +1024,10 @@ La implementacion del `.cpp` tiene esta estructura:
 
 | Comando | Descripcion |
 |---------|------------|
-| `{"cmd": "status"}` | Solicitar telemetria completa |
+| `{"cmd": "status"}` | Solicitar telemetria (sin auth) |
+| `{"cmd": "auth", "pin": "1234"}` | Autenticarse |
 | `{"cmd": "wifi", "pin": "...", "ssid": "...", "pass": "..."}` | Cambiar WiFi |
+| `{"cmd": "set_hostname", "hostname": "..."}` | Cambiar hostname mDNS (auth) |
 
 ### Comandos ENV
 
@@ -1017,5 +1098,5 @@ La implementacion del `.cpp` tiene esta estructura:
 
 ---
 
-> **HomeNode v0.4.0** — Plataforma IoT domestica modular
-> Documentacion generada: 2026-03-14
+> **HomeNode v0.7.0** — Plataforma IoT domestica modular
+> Documentacion generada: 2026-03-14 | Actualizada: 2026-03-16

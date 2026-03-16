@@ -2,7 +2,7 @@
  * @file    smrt_core_config.h
  * @brief   Platform configuration defines for HomeNode
  * @project HOMENODE
- * @version 0.6.0
+ * @version 0.7.0
  *
  * All compile-time constants for the HomeNode platform are centralized here.
  * Modules should NOT define their own network/timing constants — use these.
@@ -15,7 +15,7 @@
 // Platform identity
 //-----------------------------------------------------------------------------
 #define SMRT_PLATFORM_NAME          "HomeNode"      /**< Platform display name */
-#define SMRT_PLATFORM_VERSION       "0.6.0"         /**< Platform firmware version */
+#define SMRT_PLATFORM_VERSION       "0.7.0"         /**< Platform firmware version */
 
 //-----------------------------------------------------------------------------
 // Network — HTTP / WebSocket
@@ -53,9 +53,10 @@
 //-----------------------------------------------------------------------------
 // OTA (Over-The-Air updates)
 //-----------------------------------------------------------------------------
-#define SMRT_OTA_HOSTNAME           "homenode"      /**< mDNS hostname for OTA */
+#define SMRT_OTA_HOSTNAME           "homenode"      /**< mDNS hostname for OTA (default) */
 #define SMRT_OTA_PORT               3232            /**< OTA upload port */
 #define SMRT_OTA_PASSWORD           "hN!0t4$ecUr3"  /**< OTA password (change for each device) */
+#define SMRT_MDNS_HOSTNAME_MAX      33              /**< Max hostname length (32+null) */
 
 //-----------------------------------------------------------------------------
 // Security — Authentication & rate limiting
@@ -98,9 +99,22 @@
 #define SMRT_SERIAL_BUFF_SIZE       20              /**< Serial buffer size (bytes) */
 
 //-----------------------------------------------------------------------------
+// Debug logging — only active when -D SMRT_DEBUG is set in build flags
+//-----------------------------------------------------------------------------
+#ifdef SMRT_DEBUG
+    #define SMRT_DEBUG_LOG(...)     Serial.println(__VA_ARGS__)
+    #define SMRT_DEBUG_PRINTF(...)  Serial.printf(__VA_ARGS__)
+#else
+    #define SMRT_DEBUG_LOG(...)     ((void)0)
+    #define SMRT_DEBUG_PRINTF(...)  ((void)0)
+#endif
+
+//-----------------------------------------------------------------------------
 // GPIO — Built-in LED (generic, no module-specific pins here)
 //-----------------------------------------------------------------------------
 #define SMRT_LED_BUILTIN            2               /**< Built-in LED pin (GPIO2) */
+#define SMRT_LED_BLINK_NORMAL_MS    5000            /**< LED blink interval — normal operation */
+#define SMRT_LED_BLINK_AP_MS        500             /**< LED blink interval — AP fallback mode */
 
 //-----------------------------------------------------------------------------
 // I2C bus defaults

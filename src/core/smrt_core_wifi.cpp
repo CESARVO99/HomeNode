@@ -2,7 +2,7 @@
  * @file    smrt_core_wifi.cpp
  * @brief   WiFi connection management with AP fallback and credential persistence
  * @project HOMENODE
- * @version 0.6.0
+ * @version 0.7.0
  */
 
 //-----------------------------------------------------------------------------
@@ -23,6 +23,7 @@ static const char *SMRT_WIFI_FALLBACK_PASS = "CHANGE_ME_PASS";
 static char smrt_active_ssid[SMRT_WIFI_SSID_MAX] = {0};
 static char smrt_active_pass[SMRT_WIFI_PASS_MAX] = {0};
 static char smrt_config_pin[SMRT_WIFI_PIN_MAX]   = {0};
+static char smrt_hostname[SMRT_MDNS_HOSTNAME_MAX] = {0};  /**< mDNS hostname */
 static bool smrt_wifi_ap_active = false;            /**< True if AP fallback is active */
 
 //-----------------------------------------------------------------------------
@@ -47,17 +48,22 @@ void smrt_wifi_init(void) {
     if (!smrt_wifi_load_credentials(smrt_active_ssid, smrt_active_pass, SMRT_WIFI_SSID_MAX)) {
         strncpy(smrt_active_ssid, SMRT_WIFI_FALLBACK_SSID, SMRT_WIFI_SSID_MAX - 1);
         strncpy(smrt_active_pass, SMRT_WIFI_FALLBACK_PASS, SMRT_WIFI_PASS_MAX - 1);
-        Serial.println("NVS: No saved credentials, using fallback");
+        SMRT_DEBUG_LOG("NVS: No saved credentials, using fallback");
     } else {
-        Serial.println("NVS: Loaded WiFi credentials for: " + String(smrt_active_ssid));
+        SMRT_DEBUG_LOG("NVS: Loaded WiFi credentials for: " + String(smrt_active_ssid));
     }
 
     // Load config PIN from NVS or use default
     if (!smrt_wifi_load_pin(smrt_config_pin, SMRT_WIFI_PIN_MAX)) {
         strncpy(smrt_config_pin, SMRT_WIFI_PIN_DEFAULT, SMRT_WIFI_PIN_MAX - 1);
-        Serial.println("NVS: No saved PIN, using default");
+        SMRT_DEBUG_LOG("NVS: No saved PIN, using default");
     } else {
-        Serial.println("NVS: Loaded config PIN");
+        SMRT_DEBUG_LOG("NVS: Loaded config PIN");
+    }
+
+    // Load mDNS hostname from NVS or use default
+    if (!smrt_nvs_get_string(SMRT_NVS_NAMESPACE, "mdns_host", smrt_hostname, SMRT_MDNS_HOSTNAME_MAX)) {
+        strncpy(smrt_hostname, SMRT_OTA_HOSTNAME, SMRT_MDNS_HOSTNAME_MAX - 1);
     }
 
     // Configure static IP address
@@ -68,6 +74,7 @@ void smrt_wifi_init(void) {
 
     // Attempt STA connection with timeout
     WiFi.mode(WIFI_STA);
+    WiFi.setHostname(smrt_hostname);
     WiFi.disconnect();
 
     if (!WiFi.config(local_ip, gateway, subnet, dns)) {
@@ -75,7 +82,7 @@ void smrt_wifi_init(void) {
     }
 
     WiFi.begin(smrt_active_ssid, smrt_active_pass);
-    Serial.println("WiFi: Connecting to " + String(smrt_active_ssid) + "...");
+    SMRT_DEBUG_LOG("WiFi: Connecting to " + String(smrt_active_ssid) + "...");
 
     unsigned long start_ms = millis();
     while (WiFi.status() != WL_CONNECTED) {
@@ -118,7 +125,7 @@ static void smrt_wifi_start_ap(void) {
 void smrt_wifi_save_credentials(const char *ssid, const char *pass) {
     smrt_nvs_set_string(SMRT_NVS_NAMESPACE, "wifi_ssid", ssid);
     smrt_nvs_set_string(SMRT_NVS_NAMESPACE, "wifi_pass", pass);
-    Serial.println("NVS: WiFi credentials saved");
+    SMRT_DEBUG_LOG("NVS: WiFi credentials saved");
 }
 
 /**
@@ -143,7 +150,7 @@ bool smrt_wifi_load_credentials(char *ssid, char *pass, size_t max_len) {
  */
 void smrt_wifi_save_pin(const char *pin) {
     smrt_nvs_set_string(SMRT_NVS_NAMESPACE, "cfg_pin", pin);
-    Serial.println("NVS: Config PIN saved");
+    SMRT_DEBUG_LOG("NVS: Config PIN saved");
 }
 
 /**
@@ -188,6 +195,34 @@ void smrt_wifi_set_pin(const char *new_pin) {
  */
 bool smrt_wifi_is_ap_mode(void) {
     return smrt_wifi_ap_active;
+}
+
+/**
+ * @brief  Returns the active mDNS hostname
+ * @return Pointer to hostname buffer
+ */
+const char *smrt_wifi_get_hostname(void) {
+    return smrt_hostname;
+}
+
+/**
+ * @brief  Saves mDNS hostname to NVS
+ * @param  hostname  Hostname string to store
+ * @return void
+ */
+void smrt_wifi_save_hostname(const char *hostname) {
+    smrt_nvs_set_string(SMRT_NVS_NAMESPACE, "mdns_host", hostname);
+    SMRT_DEBUG_LOG("NVS: Hostname saved");
+}
+
+/**
+ * @brief  Updates the in-memory mDNS hostname
+ * @param  hostname  New hostname string
+ * @return void
+ */
+void smrt_wifi_set_hostname(const char *hostname) {
+    strncpy(smrt_hostname, hostname, SMRT_MDNS_HOSTNAME_MAX - 1);
+    smrt_hostname[SMRT_MDNS_HOSTNAME_MAX - 1] = '\0';
 }
 
 #endif // UNIT_TEST

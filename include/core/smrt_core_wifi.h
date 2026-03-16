@@ -2,7 +2,7 @@
  * @file    smrt_core_wifi.h
  * @brief   WiFi management — connect, reconnect, credential storage
  * @project HOMENODE
- * @version 0.2.0
+ * @version 0.7.0
  */
 
 #ifndef SMRT_CORE_WIFI_H
@@ -77,6 +77,26 @@ void smrt_wifi_set_pin(const char *new_pin);
  * @return true if AP mode active, false if STA connected
  */
 bool smrt_wifi_is_ap_mode(void);
+
+/**
+ * @brief  Returns the active mDNS hostname
+ * @return Pointer to hostname buffer
+ */
+const char *smrt_wifi_get_hostname(void);
+
+/**
+ * @brief  Saves mDNS hostname to NVS
+ * @param  hostname  Hostname string to store
+ * @return void
+ */
+void smrt_wifi_save_hostname(const char *hostname);
+
+/**
+ * @brief  Updates the in-memory mDNS hostname
+ * @param  hostname  New hostname string
+ * @return void
+ */
+void smrt_wifi_set_hostname(const char *hostname);
 
 #ifdef __cplusplus
 }

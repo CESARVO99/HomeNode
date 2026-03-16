@@ -2,7 +2,7 @@
  * @file    smrt_core_ws.cpp
  * @brief   WebSocket server with authentication, rate limiting, module dispatch
  * @project HOMENODE
- * @version 0.6.0
+ * @version 0.7.0
  *
  * Security features (v0.4.1):
  *   - WebSocket authentication via "auth" command (PIN-based)
@@ -130,7 +130,7 @@ static void smrt_ws_handle_auth_cmd(JsonDocument &doc, uint32_t client_id) {
         } else {
             smrt_ws_send_auth_response(client_id, false, "PIN incorrecto");
         }
-        Serial.printf("AUTH: Failed PIN attempt from client #%u\n", client_id);
+        SMRT_DEBUG_PRINTF("AUTH: Failed PIN attempt from client #%u\n", client_id);
         return;
     }
 
@@ -138,7 +138,7 @@ static void smrt_ws_handle_auth_cmd(JsonDocument &doc, uint32_t client_id) {
     smrt_auth_pin_reset();
     smrt_auth_ws_login(client_id);
     smrt_ws_send_auth_response(client_id, true, "Autenticado correctamente");
-    Serial.printf("AUTH: Client #%u authenticated\n", client_id);
+    SMRT_DEBUG_PRINTF("AUTH: Client #%u authenticated\n", client_id);
 }
 
 //-----------------------------------------------------------------------------
@@ -174,7 +174,7 @@ static void smrt_ws_handle_wifi_cmd(JsonDocument &doc) {
         } else {
             smrt_ws_send_wifi_response(false, "PIN incorrecto");
         }
-        Serial.println("WiFi config: Invalid PIN attempt");
+        SMRT_DEBUG_LOG("WiFi config: Invalid PIN attempt");
         return;
     }
 
@@ -188,14 +188,14 @@ static void smrt_ws_handle_wifi_cmd(JsonDocument &doc) {
 
     // Save credentials
     smrt_wifi_save_credentials(ssid, pass ? pass : "");
-    Serial.println("WiFi config: Credentials saved for: " + String(ssid));
+    SMRT_DEBUG_LOG("WiFi config: Credentials saved for: " + String(ssid));
 
     // Check if a new PIN was provided
     const char *new_pin = doc["new_pin"];
     if (new_pin && strlen(new_pin) >= 4) {
         smrt_wifi_save_pin(new_pin);
         smrt_wifi_set_pin(new_pin);
-        Serial.println("WiFi config: PIN updated");
+        SMRT_DEBUG_LOG("WiFi config: PIN updated");
     }
 
     smrt_ws_send_wifi_response(true, "Credenciales guardadas. Reiniciando en 3s...");
@@ -251,6 +251,25 @@ static void smrt_ws_dispatch_command(JsonDocument &doc, uint32_t client_id) {
     /* Refresh session activity timestamp */
     smrt_auth_ws_touch(client_id);
 
+    /* Set hostname (requires auth) */
+    if (strcmp(cmd, "set_hostname") == 0) {
+        const char *hostname = doc["hostname"];
+        if (!hostname || strlen(hostname) < 1 || strlen(hostname) > SMRT_MDNS_HOSTNAME_MAX - 1) {
+            smrt_ws_send_error(client_id, "Hostname invalido (1-32 caracteres)");
+            return;
+        }
+        smrt_wifi_set_hostname(hostname);
+        smrt_wifi_save_hostname(hostname);
+
+        JsonDocument resp;
+        resp["hostname_result"] = true;
+        resp["hostname_msg"]    = "Hostname guardado. Reinicia para aplicar.";
+        String respStr;
+        serializeJson(resp, respStr);
+        smrt_ws.text(client_id, respStr);
+        return;
+    }
+
     /* Module dispatch (prefix stripping) */
     smrt_module_dispatch(cmd, (void *)&doc, (void *)0);
 }
@@ -276,6 +295,7 @@ void smrt_ws_send_status(void) {
     doc["clients"] = smrt_ws.count();
     doc["ssid"]    = String(smrt_wifi_get_ssid());
     doc["ap_mode"] = smrt_wifi_is_ap_mode();
+    doc["version"] = SMRT_PLATFORM_VERSION;
 
     // Module telemetry
     JsonObject modules = doc["modules"].to<JsonObject>();
@@ -349,12 +369,12 @@ void smrt_ws_on_event(AsyncWebSocket *server, AsyncWebSocketClient *client,
                 client->close();
                 return;
             }
-            Serial.printf("WebSocket client #%u connected from %s\n",
-                          client->id(), client->remoteIP().toString().c_str());
+            SMRT_DEBUG_PRINTF("WebSocket client #%u connected from %s\n",
+                              client->id(), client->remoteIP().toString().c_str());
             smrt_ws_send_status();
             break;
         case WS_EVT_DISCONNECT:
-            Serial.printf("WebSocket client #%u disconnected\n", client->id());
+            SMRT_DEBUG_PRINTF("WebSocket client #%u disconnected\n", client->id());
             smrt_auth_ws_logout(client->id());
             break;
         case WS_EVT_DATA:

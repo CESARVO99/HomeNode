@@ -1,7 +1,7 @@
-# HomeNode v0.4.0 — Auditoria de Seguridad y Funcionalidad
+# HomeNode v0.7.0 — Auditoria de Seguridad y Funcionalidad
 
 > **Revision estatica de codigo | Analisis de superficie de ataque**
-> Fecha: 2026-03-14 | Version auditada: 0.4.0
+> Fecha: 2026-03-16 | Version auditada: 0.7.0 (actualizada desde 0.4.0)
 > Auditor: Claude (asistido por IA)
 
 ---
@@ -34,19 +34,28 @@
 
 ### Hallazgos
 
-| Severidad | Cantidad | Descripcion |
-|-----------|----------|------------|
-| **CRITICA** | 4 | Pueden comprometer totalmente el dispositivo |
-| **ALTA** | 4 | Facilitan ataques significativos |
-| **MEDIA** | 4 | Debilidades explotables en escenarios especificos |
-| **BAJA/INFO** | 2 | Riesgo minimo, buenas practicas |
-| **Gaps funcionales** | 23 | Funcionalidades faltantes o incompletas |
+| Severidad | Total | Resueltas | Pendientes | Descripcion |
+|-----------|-------|-----------|------------|------------|
+| **CRITICA** | 4 | 2 (V-01, V-02, V-03) | 1 (V-04) | Control del dispositivo |
+| **ALTA** | 4 | 3 (V-05, V-08) | 2 (V-06, V-07) | Ataques significativos |
+| **MEDIA** | 4 | 4 (V-09..V-12) | 0 | Debilidades especificas |
+| **BAJA/INFO** | 2 | 2 (V-13, V-14) | 0 | Buenas practicas |
+| **Gaps funcionales** | 28 | 14 | 14 | Funcionalidades faltantes |
+
+### Resolucion por FASE
+
+| FASE | Version | Items resueltos |
+|------|---------|-----------------|
+| FASE 4 | v0.4.0 | V-01 (OTA password), V-02 (HTTP auth OTA), V-03 (WS auth), V-05 (rate limiting), V-08 (PIN lockout) |
+| FASE 5 | v0.5.0 | F-07 (vibracion SEC), F-08 (events SEC persist), F-12/F-16 (NVS throttle), F-19 (events ACC persist), F-23 (WebUI 6 modulos) |
+| FASE 6 | v0.6.0 | V-09 (session timeout), V-10 (WS client limit), V-11 (origin validation), F-24 (AP fallback), F-25 (watchdog) |
+| FASE 7 | v0.7.0 | V-12 (mDNS configurable), V-13 (debug flag), V-14 (version dinamica), F-01 (ENV retry), F-21 (ACC lockout), F-28 (LED status) |
 
 ### Veredicto
 
-La plataforma tiene una arquitectura modular solida con buena cobertura de tests. Sin embargo, **carece de mecanismos de seguridad basicos** para un dispositivo IoT conectado a red. Las 4 vulnerabilidades criticas permiten a cualquier dispositivo en la misma red local tomar control completo del dispositivo, incluyendo flashear firmware malicioso.
+La plataforma ha mejorado significativamente desde v0.4.0. Las vulnerabilidades criticas P0 estan resueltas (autenticacion WS, OTA protegido, rate limiting). Las debilidades de seguridad media estan mitigadas (session timeout, origin validation, mDNS configurable, debug flag).
 
-**Riesgo actual: ALTO** — El dispositivo NO debe exponerse a redes no confiables en su estado actual.
+**Riesgo actual: MEDIO-BAJO** — Adecuado para redes locales domesticas de confianza. Pendientes: TLS (V-07), NVS encryption (V-06), Secure Boot (V-04).
 
 ---
 
@@ -554,5 +563,5 @@ Estas 5 acciones elevan la seguridad de **CRITICA** a **MEDIA**, convirtiendo el
 
 ---
 
-> **HomeNode v0.4.0** — Auditoria de Seguridad y Funcionalidad
-> Generada: 2026-03-14
+> **HomeNode v0.7.0** — Auditoria de Seguridad y Funcionalidad
+> Generada: 2026-03-14 | Actualizada: 2026-03-16

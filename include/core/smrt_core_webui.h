@@ -2,7 +2,7 @@
  * @file    smrt_core_webui.h
  * @brief   Base HTML/CSS/JS web interface stored in PROGMEM
  * @project HOMENODE
- * @version 0.6.0
+ * @version 0.7.0
  *
  * Full dashboard with:
  *   - Connection status card
@@ -277,7 +277,7 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
             <a href="/update" class="btn btn-settings" style="text-decoration:none;">Actualizar Firmware</a>
         </div>
     </div>
-    <div class="footer">HOMENODE &middot; IoT Modular Platform &middot; v0.5.0</div>
+    <div class="footer" id="appFooter">HOMENODE &middot; IoT Modular Platform</div>
     <script>
         var gateway = 'ws://' + window.location.hostname + '/ws';
         var websocket = null;
@@ -320,6 +320,7 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 if (d.clients !== undefined) document.getElementById('sysClients').textContent = d.clients;
                 if (d.ssid) document.getElementById('sysSsid').textContent = d.ssid;
                 if (d.ap_mode !== undefined) document.getElementById('apBanner').style.display = d.ap_mode ? '' : 'none';
+                if (d.version) document.getElementById('appFooter').textContent = 'HOMENODE \u00B7 IoT Modular Platform \u00B7 v' + d.version;
                 /* Auth response */
                 if (d.auth_result !== undefined) {
                     setAuth(d.auth_result);

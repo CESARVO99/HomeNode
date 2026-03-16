@@ -2,7 +2,7 @@
  * @file    smrt_mod_env.cpp
  * @brief   Environmental monitoring module — DHT22 temperature & humidity
  * @project HOMENODE
- * @version 0.3.0
+ * @version 0.7.0
  *
  * Implements the smrt_module_t interface for environmental sensor monitoring.
  * Hardware: DHT22 on GPIO4 (configurable via smrt_mod_env_config.h).
@@ -111,18 +111,24 @@ int smrt_env_get_status(void) {
  * @return void
  */
 static void env_read_sensor(void) {
-    float t = env_dht.readTemperature();
-    float h = env_dht.readHumidity();
+    for (int attempt = 0; attempt < SMRT_ENV_READ_RETRIES; attempt++) {
+        float t = env_dht.readTemperature();
+        float h = env_dht.readHumidity();
 
-    if (isnan(t) || isnan(h)) {
-        env_last_ok = 0;
-        Serial.println("[ENV] Sensor read error (NaN)");
-        return;
+        if (!isnan(t) && !isnan(h)) {
+            env_last_temp = t + SMRT_ENV_TEMP_OFFSET;
+            env_last_hum  = h + SMRT_ENV_HUM_OFFSET;
+            env_last_ok   = 1;
+            return;
+        }
+
+        if (attempt < SMRT_ENV_READ_RETRIES - 1) {
+            delay(SMRT_ENV_RETRY_DELAY_MS);
+        }
     }
 
-    env_last_temp = t + SMRT_ENV_TEMP_OFFSET;
-    env_last_hum  = h + SMRT_ENV_HUM_OFFSET;
-    env_last_ok   = 1;
+    env_last_ok = 0;
+    Serial.println("[ENV] Sensor read error after retries");
 }
 
 //-----------------------------------------------------------------------------

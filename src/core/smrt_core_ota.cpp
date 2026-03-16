@@ -2,7 +2,7 @@
  * @file    smrt_core_ota.cpp
  * @brief   OTA update implementation — ArduinoOTA + HTTP firmware upload
  * @project HOMENODE
- * @version 0.4.1
+ * @version 0.7.0
  */
 
 //-----------------------------------------------------------------------------
@@ -163,7 +163,7 @@ static const char smrt_ota_page[] PROGMEM = R"rawliteral(
  * @return void
  */
 void smrt_ota_init(void) {
-    ArduinoOTA.setHostname(SMRT_OTA_HOSTNAME);
+    ArduinoOTA.setHostname(smrt_wifi_get_hostname());
     ArduinoOTA.setPort(SMRT_OTA_PORT);
 
     if (strlen(SMRT_OTA_PASSWORD) > 0) {
