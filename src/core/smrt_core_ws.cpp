@@ -2,7 +2,7 @@
  * @file    smrt_core_ws.cpp
  * @brief   WebSocket server with authentication, rate limiting, module dispatch
  * @project HOMENODE
- * @version 0.4.1
+ * @version 0.6.0
  *
  * Security features (v0.4.1):
  *   - WebSocket authentication via "auth" command (PIN-based)
@@ -27,6 +27,26 @@ extern AsyncWebSocket smrt_ws;
 // Active client tracking (for per-client message routing)
 //-----------------------------------------------------------------------------
 static uint32_t smrt_ws_active_client_id = 0;  /**< Client ID for current message */
+
+//-----------------------------------------------------------------------------
+// IP validation helper
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief  Checks if an IP address belongs to a private/local network (RFC1918).
+ *         Allows: 192.168.x.x, 10.x.x.x, 172.16-31.x.x, 127.x.x.x
+ * @param  ip  IP address to validate
+ * @return true if local/private, false otherwise
+ */
+static bool smrt_ws_is_local_ip(IPAddress ip) {
+    uint8_t b0 = ip[0];
+    uint8_t b1 = ip[1];
+    if (b0 == 192 && b1 == 168) return true;
+    if (b0 == 10) return true;
+    if (b0 == 172 && b1 >= 16 && b1 <= 31) return true;
+    if (b0 == 127) return true;
+    return false;
+}
 
 //-----------------------------------------------------------------------------
 // Auth response helpers
@@ -228,6 +248,9 @@ static void smrt_ws_dispatch_command(JsonDocument &doc, uint32_t client_id) {
         return;
     }
 
+    /* Refresh session activity timestamp */
+    smrt_auth_ws_touch(client_id);
+
     /* Module dispatch (prefix stripping) */
     smrt_module_dispatch(cmd, (void *)&doc, (void *)0);
 }
@@ -248,9 +271,11 @@ void smrt_ws_send_status(void) {
     // Core telemetry
     doc["rssi"]    = WiFi.RSSI();
     doc["uptime"]  = millis();
-    doc["ip"]      = WiFi.localIP().toString();
+    doc["ip"]      = smrt_wifi_is_ap_mode() ? WiFi.softAPIP().toString()
+                                             : WiFi.localIP().toString();
     doc["clients"] = smrt_ws.count();
     doc["ssid"]    = String(smrt_wifi_get_ssid());
+    doc["ap_mode"] = smrt_wifi_is_ap_mode();
 
     // Module telemetry
     JsonObject modules = doc["modules"].to<JsonObject>();
@@ -318,6 +343,12 @@ void smrt_ws_on_event(AsyncWebSocket *server, AsyncWebSocketClient *client,
                       AwsEventType type, void *arg, uint8_t *data, size_t len) {
     switch (type) {
         case WS_EVT_CONNECT:
+            if (!smrt_ws_is_local_ip(client->remoteIP())) {
+                Serial.printf("WS: Rejected non-local client from %s\n",
+                              client->remoteIP().toString().c_str());
+                client->close();
+                return;
+            }
             Serial.printf("WebSocket client #%u connected from %s\n",
                           client->id(), client->remoteIP().toString().c_str());
             smrt_ws_send_status();

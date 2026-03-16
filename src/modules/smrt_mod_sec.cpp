@@ -51,6 +51,8 @@ static unsigned long sec_pir_debounce  = 0;
 static unsigned long sec_reed_debounce = 0;
 static unsigned long sec_vibr_debounce = 0;
 static unsigned long sec_events_last_nvs_ms = 0;
+static bool          sec_armed_dirty       = false; /**< Dirty flag for armed state debounce */
+static unsigned long sec_armed_last_nvs_ms = 0;     /**< Last armed state NVS write timestamp */
 #endif
 
 //=============================================================================
@@ -362,7 +364,7 @@ static void sec_process_event(int event) {
 
     case SMRT_SEC_STATE_ARMED:
         smrt_sec_add_event("Sistema armado", millis());
-        smrt_nvs_set_bool(SMRT_SEC_NVS_NAMESPACE, SMRT_SEC_NVS_KEY_ARMED, true);
+        sec_armed_dirty = true;
         Serial.println("[SEC] System ARMED");
         break;
 
@@ -382,7 +384,7 @@ static void sec_process_event(int event) {
     case SMRT_SEC_STATE_DISARMED:
         digitalWrite(SMRT_SEC_BUZZER_PIN, LOW);
         smrt_sec_add_event("Sistema desarmado", millis());
-        smrt_nvs_set_bool(SMRT_SEC_NVS_NAMESPACE, SMRT_SEC_NVS_KEY_ARMED, false);
+        sec_armed_dirty = true;
         Serial.println("[SEC] System DISARMED");
         break;
 
@@ -453,6 +455,14 @@ static void sec_init(void) {
  */
 static void sec_loop(void) {
     unsigned long now = millis();
+
+    /* Debounced NVS write for armed state changes */
+    if (sec_armed_dirty && (now - sec_armed_last_nvs_ms >= SMRT_NVS_STATE_DEBOUNCE_MS)) {
+        bool armed = (sec_alarm_state != SMRT_SEC_STATE_DISARMED);
+        smrt_nvs_set_bool(SMRT_SEC_NVS_NAMESPACE, SMRT_SEC_NVS_KEY_ARMED, armed);
+        sec_armed_dirty = false;
+        sec_armed_last_nvs_ms = now;
+    }
 
     /* Check delay timeouts */
     if (sec_alarm_state == SMRT_SEC_STATE_EXIT_DELAY) {

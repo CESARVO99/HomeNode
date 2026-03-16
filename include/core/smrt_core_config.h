@@ -2,7 +2,7 @@
  * @file    smrt_core_config.h
  * @brief   Platform configuration defines for HomeNode
  * @project HOMENODE
- * @version 0.5.0
+ * @version 0.6.0
  *
  * All compile-time constants for the HomeNode platform are centralized here.
  * Modules should NOT define their own network/timing constants — use these.
@@ -15,7 +15,7 @@
 // Platform identity
 //-----------------------------------------------------------------------------
 #define SMRT_PLATFORM_NAME          "HomeNode"      /**< Platform display name */
-#define SMRT_PLATFORM_VERSION       "0.5.0"         /**< Platform firmware version */
+#define SMRT_PLATFORM_VERSION       "0.6.0"         /**< Platform firmware version */
 
 //-----------------------------------------------------------------------------
 // Network — HTTP / WebSocket
@@ -40,6 +40,10 @@
 #define SMRT_WIFI_PASS_MAX          65              /**< Max password length (64+null) */
 #define SMRT_WIFI_PIN_MAX           9               /**< Max config PIN length (8+null) */
 #define SMRT_WIFI_PIN_DEFAULT       "1234"          /**< Default config access PIN */
+#define SMRT_WIFI_STA_TIMEOUT_MS    15000           /**< Max wait for STA connection (15s) */
+#define SMRT_WIFI_AP_SSID           "HomeNode-Setup" /**< Soft AP SSID for fallback */
+#define SMRT_WIFI_AP_PASS           "homenode123"   /**< Soft AP password (min 8 chars) */
+#define SMRT_WIFI_AP_CHANNEL        1               /**< Soft AP WiFi channel */
 
 //-----------------------------------------------------------------------------
 // NVS (Non-Volatile Storage)
@@ -59,6 +63,7 @@
 #define SMRT_AUTH_MAX_WS_CLIENTS    8               /**< Max tracked WS client slots */
 #define SMRT_AUTH_PIN_MAX_ATTEMPTS  3               /**< Failed PIN attempts before lockout */
 #define SMRT_AUTH_PIN_LOCKOUT_MS    60000            /**< PIN lockout duration (60s) */
+#define SMRT_AUTH_SESSION_TIMEOUT_MS 600000          /**< WS session inactivity timeout (10 min) */
 #define SMRT_AUTH_OTA_USER          "admin"          /**< HTTP Basic Auth user for /update */
 #define SMRT_AUTH_OTA_PASS          "hN!0t4$ecUr3"  /**< HTTP Basic Auth password for /update */
 
@@ -66,6 +71,7 @@
 // NVS write throttling
 //-----------------------------------------------------------------------------
 #define SMRT_NVS_WRITE_INTERVAL_MS  300000          /**< Min interval between NVS writes (5 min) */
+#define SMRT_NVS_STATE_DEBOUNCE_MS  5000            /**< Min interval for state NVS writes (5s) */
 
 //-----------------------------------------------------------------------------
 // Timing
@@ -78,6 +84,11 @@
 // Module system
 //-----------------------------------------------------------------------------
 #define SMRT_MAX_MODULES            8               /**< Maximum registered modules */
+
+//-----------------------------------------------------------------------------
+// Watchdog
+//-----------------------------------------------------------------------------
+#define SMRT_WDT_TIMEOUT_S          30              /**< Task watchdog timeout (seconds) */
 
 //-----------------------------------------------------------------------------
 // Serial

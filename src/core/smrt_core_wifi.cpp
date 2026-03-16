@@ -1,8 +1,8 @@
 /**
  * @file    smrt_core_wifi.cpp
- * @brief   WiFi connection management and credential persistence
+ * @brief   WiFi connection management with AP fallback and credential persistence
  * @project HOMENODE
- * @version 0.2.0
+ * @version 0.6.0
  */
 
 //-----------------------------------------------------------------------------
@@ -23,17 +23,26 @@ static const char *SMRT_WIFI_FALLBACK_PASS = "CHANGE_ME_PASS";
 static char smrt_active_ssid[SMRT_WIFI_SSID_MAX] = {0};
 static char smrt_active_pass[SMRT_WIFI_PASS_MAX] = {0};
 static char smrt_config_pin[SMRT_WIFI_PIN_MAX]   = {0};
+static bool smrt_wifi_ap_active = false;            /**< True if AP fallback is active */
+
+//-----------------------------------------------------------------------------
+// Forward declarations
+//-----------------------------------------------------------------------------
+static void smrt_wifi_start_ap(void);
 
 //-----------------------------------------------------------------------------
 // Public functions
 //-----------------------------------------------------------------------------
 
 /**
- * @brief  Initializes WiFi in STA mode with static IP and connects.
- *         Loads credentials from NVS; uses fallback if none saved.
+ * @brief  Initializes WiFi in STA mode with AP fallback.
+ *         Attempts STA connection for SMRT_WIFI_STA_TIMEOUT_MS.
+ *         If timeout expires, starts soft AP for reconfiguration via WebUI.
  * @return void
  */
 void smrt_wifi_init(void) {
+    smrt_wifi_ap_active = false;
+
     // Load WiFi credentials from NVS or use fallback
     if (!smrt_wifi_load_credentials(smrt_active_ssid, smrt_active_pass, SMRT_WIFI_SSID_MAX)) {
         strncpy(smrt_active_ssid, SMRT_WIFI_FALLBACK_SSID, SMRT_WIFI_SSID_MAX - 1);
@@ -57,7 +66,7 @@ void smrt_wifi_init(void) {
     IPAddress subnet(SMRT_SUBNET_MASK);
     IPAddress dns(SMRT_DNS_IP);
 
-    // WiFi station mode
+    // Attempt STA connection with timeout
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
 
@@ -66,15 +75,38 @@ void smrt_wifi_init(void) {
     }
 
     WiFi.begin(smrt_active_ssid, smrt_active_pass);
-    delay(SMRT_WIFI_RETRY_MS);
+    Serial.println("WiFi: Connecting to " + String(smrt_active_ssid) + "...");
 
+    unsigned long start_ms = millis();
     while (WiFi.status() != WL_CONNECTED) {
+        if (millis() - start_ms >= SMRT_WIFI_STA_TIMEOUT_MS) {
+            Serial.println("WiFi: STA timeout — starting AP fallback");
+            smrt_wifi_start_ap();
+            return;
+        }
         delay(SMRT_WIFI_RETRY_MS);
         Serial.println("Connecting.. status: " + String(WiFi.status()));
     }
 
     Serial.print("WiFi connected. IP: ");
     Serial.println(WiFi.localIP());
+}
+
+/**
+ * @brief  Starts soft AP for fallback configuration.
+ *         Device is accessible at 192.168.4.1 via WebUI.
+ * @return void
+ */
+static void smrt_wifi_start_ap(void) {
+    WiFi.disconnect();
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(SMRT_WIFI_AP_SSID, SMRT_WIFI_AP_PASS, SMRT_WIFI_AP_CHANNEL);
+    smrt_wifi_ap_active = true;
+
+    Serial.println("WiFi AP active:");
+    Serial.println("  SSID: " SMRT_WIFI_AP_SSID);
+    Serial.println("  IP:   " + WiFi.softAPIP().toString());
+    Serial.println("  Connect and open WebUI to configure WiFi credentials");
 }
 
 /**
@@ -148,6 +180,14 @@ const char *smrt_wifi_get_pin(void) {
 void smrt_wifi_set_pin(const char *new_pin) {
     strncpy(smrt_config_pin, new_pin, SMRT_WIFI_PIN_MAX - 1);
     smrt_config_pin[SMRT_WIFI_PIN_MAX - 1] = '\0';
+}
+
+/**
+ * @brief  Checks if WiFi is running in AP fallback mode.
+ * @return true if AP mode active, false if STA connected
+ */
+bool smrt_wifi_is_ap_mode(void) {
+    return smrt_wifi_ap_active;
 }
 
 #endif // UNIT_TEST

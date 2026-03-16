@@ -72,6 +72,12 @@ const char *smrt_wifi_get_pin(void);
  */
 void smrt_wifi_set_pin(const char *new_pin);
 
+/**
+ * @brief  Checks if WiFi is running in AP fallback mode.
+ * @return true if AP mode active, false if STA connected
+ */
+bool smrt_wifi_is_ap_mode(void);
+
 #ifdef __cplusplus
 }
 #endif

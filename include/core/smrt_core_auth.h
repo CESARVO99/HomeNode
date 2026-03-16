@@ -1,11 +1,12 @@
 /**
  * @file    smrt_core_auth.h
- * @brief   Authentication, rate limiting and WebSocket session management
+ * @brief   Authentication, rate limiting, session timeout and WS management
  * @project HOMENODE
- * @version 0.4.1
+ * @version 0.6.0
  *
  * Provides:
  *   - WebSocket client authentication tracking (per client ID)
+ *   - Session inactivity timeout with auto-logout
  *   - PIN rate limiting with lockout after N failed attempts
  *   - HTTP Basic Auth validation for OTA endpoint
  */
@@ -70,6 +71,20 @@ void smrt_auth_pin_reset(void);
  * @return Seconds remaining in lockout, or 0
  */
 unsigned long smrt_auth_pin_lockout_remaining(void);
+
+/**
+ * @brief  Updates last-activity timestamp for an authenticated client.
+ * @param  client_id  WebSocket client ID
+ * @return void
+ */
+void smrt_auth_ws_touch(uint32_t client_id);
+
+/**
+ * @brief  Logs out clients idle longer than SMRT_AUTH_SESSION_TIMEOUT_MS.
+ *         Call from the main loop.
+ * @return void
+ */
+void smrt_auth_ws_cleanup_expired(void);
 
 #ifdef __cplusplus
 }

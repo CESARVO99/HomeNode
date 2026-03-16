@@ -2,7 +2,7 @@
  * @file    smrt_core_webui.h
  * @brief   Base HTML/CSS/JS web interface stored in PROGMEM
  * @project HOMENODE
- * @version 0.5.0
+ * @version 0.6.0
  *
  * Full dashboard with:
  *   - Connection status card
@@ -124,6 +124,13 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 <span id="connText" class="conn-text disconnected">Disconnected</span>
             </div>
             <div id="connIp" class="conn-ip">IP: ---</div>
+        </div>
+        <!-- AP mode banner -->
+        <div id="apBanner" class="card" style="display:none;background:#FFF3E0;border:2px solid #E8723A">
+            <h2 style="color:#E8723A">MODO AP — Configura WiFi</h2>
+            <div style="font-size:0.85rem;color:#5D4037;margin-top:4px;">
+                No se pudo conectar a la red WiFi. Configura nuevas credenciales abajo.
+            </div>
         </div>
         <!-- System info -->
         <div class="card">
@@ -312,6 +319,7 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 if (d.ip) document.getElementById('connIp').textContent = 'IP: ' + d.ip;
                 if (d.clients !== undefined) document.getElementById('sysClients').textContent = d.clients;
                 if (d.ssid) document.getElementById('sysSsid').textContent = d.ssid;
+                if (d.ap_mode !== undefined) document.getElementById('apBanner').style.display = d.ap_mode ? '' : 'none';
                 /* Auth response */
                 if (d.auth_result !== undefined) {
                     setAuth(d.auth_result);

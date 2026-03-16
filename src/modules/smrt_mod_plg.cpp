@@ -45,6 +45,8 @@ static unsigned long plg_interval       = SMRT_PLG_INTERVAL_DEFAULT_MS;
 static unsigned long plg_last_read_ms      = 0;
 static unsigned long plg_last_energy_ms    = 0;
 static unsigned long plg_last_nvs_write_ms = 0;    /**< Throttled NVS writes */
+static bool          plg_state_dirty       = false; /**< Dirty flag for relay state debounce */
+static unsigned long plg_state_last_nvs_ms = 0;     /**< Last state NVS write timestamp */
 #endif
 
 //=============================================================================
@@ -324,6 +326,14 @@ static void plg_init(void) {
 static void plg_loop(void) {
     unsigned long now = millis();
 
+    /* Debounced NVS write for relay state changes */
+    if (plg_state_dirty && (now - plg_state_last_nvs_ms >= SMRT_NVS_STATE_DEBOUNCE_MS)) {
+        smrt_nvs_set_bool(SMRT_PLG_NVS_NAMESPACE, SMRT_PLG_NVS_KEY_STATE,
+                          (bool)plg_relay_state);
+        plg_state_dirty = false;
+        plg_state_last_nvs_ms = now;
+    }
+
     if (now - plg_last_read_ms < plg_interval) {
         return;
     }
@@ -378,8 +388,7 @@ static void plg_send_status(void) {
 static void plg_toggle(void) {
     plg_relay_state = !plg_relay_state;
     digitalWrite(SMRT_PLG_RELAY_PIN, plg_relay_state);
-    smrt_nvs_set_bool(SMRT_PLG_NVS_NAMESPACE, SMRT_PLG_NVS_KEY_STATE,
-                      (bool)plg_relay_state);
+    plg_state_dirty = true;
     Serial.println("[PLG] Relay " + String(plg_relay_state ? "ON" : "OFF"));
     plg_send_status();
 }
@@ -407,8 +416,7 @@ static void plg_ws_handler(const char *cmd, void *doc, void *client) {
         if (!json["state"].isNull()) {
             plg_relay_state = json["state"].as<int>() ? 1 : 0;
             digitalWrite(SMRT_PLG_RELAY_PIN, plg_relay_state);
-            smrt_nvs_set_bool(SMRT_PLG_NVS_NAMESPACE, SMRT_PLG_NVS_KEY_STATE,
-                              (bool)plg_relay_state);
+            plg_state_dirty = true;
         }
         plg_send_status();
         return;

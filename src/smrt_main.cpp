@@ -2,7 +2,7 @@
  * @file    smrt_main.cpp
  * @brief   HomeNode entry point — simplified setup/loop with modular architecture
  * @project HOMENODE
- * @version 0.5.0
+ * @version 0.6.0
  *
  * The main file is intentionally minimal. All functionality is delegated to
  * core subsystems and registered modules:
@@ -24,6 +24,7 @@
 // Includes
 //-----------------------------------------------------------------------------
 #include "smrt_core.h"
+#include <esp_task_wdt.h>
 
 //-----------------------------------------------------------------------------
 // External global objects (defined in smrt_core_http.cpp)
@@ -110,6 +111,10 @@ void setup() {
     // Module init (after core is ready)
     smrt_module_init_all();
 
+    // Watchdog — auto-reset if loop hangs for SMRT_WDT_TIMEOUT_S seconds
+    esp_task_wdt_init(SMRT_WDT_TIMEOUT_S, true);
+    esp_task_wdt_add(NULL);
+
     Serial.println("Setup complete. Entering main loop.");
 }
 
@@ -118,6 +123,9 @@ void setup() {
  * @return void
  */
 void loop() {
+    // Feed watchdog
+    esp_task_wdt_reset();
+
     // OTA
     ArduinoOTA.handle();
 
@@ -130,8 +138,9 @@ void loop() {
     // Module loop
     smrt_module_loop_all();
 
-    // WebSocket cleanup
+    // WebSocket cleanup + session timeout
     smrt_ws.cleanupClients();
+    smrt_auth_ws_cleanup_expired();
 
     // Periodic telemetry broadcast
     unsigned long now = millis();

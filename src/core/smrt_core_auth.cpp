@@ -2,7 +2,7 @@
  * @file    smrt_core_auth.cpp
  * @brief   Authentication, rate limiting and WebSocket session management
  * @project HOMENODE
- * @version 0.4.1
+ * @version 0.6.0
  */
 
 //-----------------------------------------------------------------------------
@@ -14,8 +14,9 @@
 //-----------------------------------------------------------------------------
 // WebSocket authenticated client tracking
 //-----------------------------------------------------------------------------
-static uint32_t smrt_auth_clients[SMRT_AUTH_MAX_WS_CLIENTS];
-static int      smrt_auth_client_count = 0;
+static uint32_t      smrt_auth_clients[SMRT_AUTH_MAX_WS_CLIENTS];
+static unsigned long smrt_auth_timestamps[SMRT_AUTH_MAX_WS_CLIENTS];  /**< Last activity per slot */
+static int           smrt_auth_client_count = 0;
 
 //-----------------------------------------------------------------------------
 // PIN rate limiting state
@@ -34,6 +35,7 @@ static unsigned long smrt_pin_lockout_start = 0;
 void smrt_auth_init(void) {
     for (int i = 0; i < SMRT_AUTH_MAX_WS_CLIENTS; i++) {
         smrt_auth_clients[i] = 0;
+        smrt_auth_timestamps[i] = 0;
     }
     smrt_auth_client_count = 0;
     smrt_pin_fail_count = 0;
@@ -62,6 +64,7 @@ int smrt_auth_ws_login(uint32_t client_id) {
         return 0;
     }
     smrt_auth_clients[smrt_auth_client_count] = client_id;
+    smrt_auth_timestamps[smrt_auth_client_count] = millis();
     smrt_auth_client_count++;
     return 1;
 }
@@ -77,6 +80,7 @@ void smrt_auth_ws_logout(uint32_t client_id) {
             /* Shift remaining entries */
             for (int j = i; j < smrt_auth_client_count - 1; j++) {
                 smrt_auth_clients[j] = smrt_auth_clients[j + 1];
+                smrt_auth_timestamps[j] = smrt_auth_timestamps[j + 1];
             }
             smrt_auth_client_count--;
             return;
@@ -156,6 +160,49 @@ unsigned long smrt_auth_pin_lockout_remaining(void) {
         return 0;
     }
     return (SMRT_AUTH_PIN_LOCKOUT_MS - elapsed) / 1000;
+}
+
+//-----------------------------------------------------------------------------
+// Public functions — Session timeout
+//-----------------------------------------------------------------------------
+
+/**
+ * @brief  Updates last-activity timestamp for an authenticated client.
+ * @param  client_id  WebSocket client ID
+ * @return void
+ */
+void smrt_auth_ws_touch(uint32_t client_id) {
+    for (int i = 0; i < smrt_auth_client_count; i++) {
+        if (smrt_auth_clients[i] == client_id) {
+            smrt_auth_timestamps[i] = millis();
+            return;
+        }
+    }
+}
+
+/**
+ * @brief  Logs out clients whose session has been idle longer than
+ *         SMRT_AUTH_SESSION_TIMEOUT_MS. Call from main loop.
+ * @return void
+ */
+void smrt_auth_ws_cleanup_expired(void) {
+    unsigned long now = millis();
+    int i = 0;
+    while (i < smrt_auth_client_count) {
+        if (now - smrt_auth_timestamps[i] >= SMRT_AUTH_SESSION_TIMEOUT_MS) {
+            Serial.printf("AUTH: Session expired for client #%u\n",
+                          smrt_auth_clients[i]);
+            /* Shift remaining entries */
+            for (int j = i; j < smrt_auth_client_count - 1; j++) {
+                smrt_auth_clients[j] = smrt_auth_clients[j + 1];
+                smrt_auth_timestamps[j] = smrt_auth_timestamps[j + 1];
+            }
+            smrt_auth_client_count--;
+            /* Don't increment i — new element shifted into this position */
+        } else {
+            i++;
+        }
+    }
 }
 
 #endif // UNIT_TEST

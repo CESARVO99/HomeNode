@@ -43,6 +43,8 @@ static const int     rly_pins[SMRT_RLY_MAX_RELAYS] = {
 static char          rly_names[SMRT_RLY_MAX_RELAYS][SMRT_RLY_NAME_MAX_LEN];
 static unsigned long rly_pulse_start[SMRT_RLY_MAX_RELAYS] = {0, 0, 0, 0};
 static int           rly_pulse_active[SMRT_RLY_MAX_RELAYS] = {0, 0, 0, 0};
+static bool          rly_state_dirty = false;                /**< Dirty flag for debounced NVS writes */
+static unsigned long rly_state_last_nvs_ms = 0;              /**< Last state NVS write timestamp */
 #endif
 
 //=============================================================================
@@ -148,10 +150,19 @@ static void rly_apply_gpio(int index) {
 }
 
 /**
- * @brief  Saves relay states bitmask to NVS.
+ * @brief  Marks relay states as dirty for deferred NVS persistence.
+ *         Actual write happens in rly_loop() with debounce.
  * @return void
  */
 static void rly_save_states(void) {
+    rly_state_dirty = true;
+}
+
+/**
+ * @brief  Writes relay states bitmask to NVS (called from loop with debounce).
+ * @return void
+ */
+static void rly_flush_states_nvs(void) {
     int32_t bitmask = 0;
     int i;
     for (i = 0; i < SMRT_RLY_MAX_RELAYS; i++) {
@@ -160,6 +171,8 @@ static void rly_save_states(void) {
         }
     }
     smrt_nvs_set_int(SMRT_RLY_NVS_NAMESPACE, SMRT_RLY_NVS_KEY_STATES, bitmask);
+    rly_state_dirty = false;
+    rly_state_last_nvs_ms = millis();
 }
 
 //-----------------------------------------------------------------------------
@@ -238,6 +251,11 @@ static void rly_loop(void) {
             rly_pulse_active[i] = 0;
             rly_save_states();
         }
+    }
+
+    /* Debounced NVS write for state changes */
+    if (rly_state_dirty && (now - rly_state_last_nvs_ms >= SMRT_NVS_STATE_DEBOUNCE_MS)) {
+        rly_flush_states_nvs();
     }
 }
 
