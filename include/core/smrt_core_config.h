@@ -2,7 +2,7 @@
  * @file    smrt_core_config.h
  * @brief   Platform configuration defines for HomeNode
  * @project HOMENODE
- * @version 0.8.0
+ * @version 0.9.0
  *
  * All compile-time constants for the HomeNode platform are centralized here.
  * Modules should NOT define their own network/timing constants — use these.
@@ -15,7 +15,7 @@
 // Platform identity
 //-----------------------------------------------------------------------------
 #define SMRT_PLATFORM_NAME          "HomeNode"      /**< Platform display name */
-#define SMRT_PLATFORM_VERSION       "0.8.0"         /**< Platform firmware version */
+#define SMRT_PLATFORM_VERSION       "0.9.0"         /**< Platform firmware version */
 
 //-----------------------------------------------------------------------------
 // Network — HTTP / WebSocket
