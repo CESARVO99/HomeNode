@@ -54,6 +54,8 @@ static int           acc_event_count = 0;
 
 #ifndef UNIT_TEST
 static MFRC522       acc_rfid(SMRT_ACC_SPI_SS, SMRT_ACC_SPI_RST);
+static bool          acc_learn_mode = false;
+static unsigned long acc_learn_start = 0;
 static int           acc_lock_state    = 0;   /**< 0=locked, 1=unlocked */
 static unsigned long acc_pulse_start   = 0;
 static int           acc_pulsing       = 0;
@@ -383,6 +385,10 @@ void smrt_acc_clear_events(void) {
     acc_event_count = 0;
 }
 
+int smrt_acc_validate_learn_timeout(unsigned long ms) {
+    return (ms >= 5000 && ms <= 120000) ? 1 : 0;
+}
+
 //=============================================================================
 // Hardware-dependent code (ESP32 only)
 //=============================================================================
@@ -574,6 +580,12 @@ static void acc_loop(void) {
         Serial.println("[ACC] Lockout expired, accepting cards again");
     }
 
+    /* Learn mode timeout */
+    if (acc_learn_mode && (millis() - acc_learn_start >= SMRT_ACC_LEARN_TIMEOUT_MS)) {
+        acc_learn_mode = false;
+        SMRT_DEBUG_LOG("[ACC] Learn mode timed out");
+    }
+
     /* Poll NFC reader */
     if (!acc_rfid.PICC_IsNewCardPresent()) {
         return;
@@ -586,6 +598,31 @@ static void acc_loop(void) {
     char uid_str[SMRT_ACC_UID_STR_LEN];
     smrt_acc_uid_bytes_to_str(acc_rfid.uid.uidByte, acc_rfid.uid.size,
                                uid_str, sizeof(uid_str));
+
+    /* Learn mode: auto-add card */
+    if (acc_learn_mode) {
+        if (smrt_acc_uid_add(uid_str) == 1) {
+            /* Save new UID to NVS */
+            char key[12];
+            snprintf(key, sizeof(key), "%s%d", SMRT_ACC_NVS_KEY_UID_PFX, smrt_acc_uid_count() - 1);
+            smrt_nvs_set_string(SMRT_ACC_NVS_NAMESPACE, key, uid_str);
+            smrt_nvs_set_int(SMRT_ACC_NVS_NAMESPACE, SMRT_ACC_NVS_KEY_UID_CNT, smrt_acc_uid_count());
+            smrt_acc_add_event("LEARNED", millis());
+            SMRT_DEBUG_PRINTF("[ACC] Learned UID: %s\n", uid_str);
+
+            JsonDocument evt;
+            evt["uid"] = uid_str;
+            evt["action"] = "learned";
+            String evt_str;
+            serializeJson(evt, evt_str);
+            smrt_event_publish(SMRT_EVT_ACC_AUTHORIZED, evt_str.c_str());
+        }
+        acc_learn_mode = false;
+        /* Skip normal auth check for this read */
+        acc_rfid.PICC_HaltA();
+        acc_rfid.PCD_StopCrypto1();
+        return;
+    }
 
     /* Check authorization */
     if (smrt_acc_uid_is_authorized(uid_str)) {
@@ -610,6 +647,14 @@ static void acc_loop(void) {
         String output;
         serializeJson(resp, output);
         smrt_ws.textAll(output);
+
+        {
+            JsonDocument evt;
+            evt["uid"] = uid_str;
+            String evt_str;
+            serializeJson(evt, evt_str);
+            smrt_event_publish(SMRT_EVT_ACC_AUTHORIZED, evt_str.c_str());
+        }
     } else {
         /* Track failed attempts for lockout */
         acc_failed_count++;
@@ -631,6 +676,14 @@ static void acc_loop(void) {
         String output;
         serializeJson(resp, output);
         smrt_ws.textAll(output);
+
+        {
+            JsonDocument evt;
+            evt["uid"] = uid_str;
+            String evt_str;
+            serializeJson(evt, evt_str);
+            smrt_event_publish(SMRT_EVT_ACC_DENIED, evt_str.c_str());
+        }
     }
 
     acc_rfid.PICC_HaltA();
@@ -802,6 +855,32 @@ static void acc_ws_handler(const char *cmd, void *doc, void *client) {
         return;
     }
 
+    if (strcmp(cmd, "learn") == 0) {
+        acc_learn_mode = true;
+        acc_learn_start = millis();
+        JsonDocument resp;
+        resp["type"]    = "acc_learn";
+        resp["active"]  = true;
+        resp["timeout"] = SMRT_ACC_LEARN_TIMEOUT_MS / 1000;
+        String output;
+        serializeJson(resp, output);
+        extern AsyncWebSocket smrt_ws;
+        smrt_ws.textAll(output);
+        return;
+    }
+
+    if (strcmp(cmd, "learn_cancel") == 0) {
+        acc_learn_mode = false;
+        JsonDocument resp;
+        resp["type"]   = "acc_learn";
+        resp["active"] = false;
+        String output;
+        serializeJson(resp, output);
+        extern AsyncWebSocket smrt_ws;
+        smrt_ws.textAll(output);
+        return;
+    }
+
     Serial.println("[ACC] Unknown sub-command: " + String(cmd));
 }
 
@@ -818,6 +897,7 @@ static void acc_get_telemetry(void *data) {
     obj["events"]   = acc_event_count;
     obj["lockout"]  = (acc_failed_count >= SMRT_ACC_MAX_FAILED_ATTEMPTS &&
                        (millis() - acc_lockout_start < SMRT_ACC_LOCKOUT_MS));
+    obj["learn_mode"] = acc_learn_mode;
 
     if (acc_event_count > 0) {
         unsigned long ts = 0;

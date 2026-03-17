@@ -80,6 +80,28 @@ float smrt_env_get_humidity(void);
  */
 int smrt_env_get_status(void);
 
+/**
+ * @brief  Checks sensor values against alert thresholds.
+ * @param  temp    Temperature reading
+ * @param  hum     Humidity reading
+ * @param  t_hi    High temp threshold
+ * @param  t_lo    Low temp threshold
+ * @param  h_hi    High humidity threshold
+ * @param  h_lo    Low humidity threshold
+ * @return Bitmask of triggered alerts (0 = no alert)
+ */
+int smrt_env_check_alert(float temp, float hum, float t_hi, float t_lo,
+                          float h_hi, float h_lo);
+
+/**
+ * @brief  Validates an alert threshold value.
+ * @param  value  Threshold value
+ * @param  min    Minimum allowed
+ * @param  max    Maximum allowed
+ * @return 1 if valid, 0 otherwise
+ */
+int smrt_env_validate_threshold(float value, float min, float max);
+
 #ifdef __cplusplus
 }
 #endif

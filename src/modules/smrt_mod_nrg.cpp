@@ -415,6 +415,16 @@ static void nrg_loop(void) {
             Serial.println("[NRG] Alert ch" + String(ch) + " P="
                            + String(nrg_ch[ch].power, 1) + "W > "
                            + String(nrg_alert_w, 0) + "W");
+
+            {
+                JsonDocument evt;
+                evt["channel"] = ch;
+                evt["power"]   = nrg_ch[ch].power;
+                evt["limit"]   = nrg_alert_w;
+                String evt_str;
+                serializeJson(evt, evt_str);
+                smrt_event_publish(SMRT_EVT_NRG_OVERLOAD, evt_str.c_str());
+            }
         }
     }
 }
@@ -601,6 +611,8 @@ static void nrg_get_telemetry(void *data) {
         cobj["va"]  = nrg_ch[ch].apparent;
         cobj["pf"]  = nrg_ch[ch].pf;
         cobj["kwh"] = nrg_energy_wh[ch];
+        cobj["apparent_power"] = nrg_ch[ch].apparent;
+        cobj["power_factor"]   = nrg_ch[ch].pf;
     }
 }
 

@@ -300,6 +300,15 @@ static void rly_handle_toggle(JsonDocument &doc) {
     rly_apply_gpio(idx);
     rly_save_states();
     rly_send_status();
+
+    {
+        JsonDocument evt;
+        evt["relay"] = idx;
+        evt["state"] = rly_states[idx];
+        String evt_str;
+        serializeJson(evt, evt_str);
+        smrt_event_publish(SMRT_EVT_RLY_CHANGED, evt_str.c_str());
+    }
 }
 
 /**
@@ -317,6 +326,15 @@ static void rly_handle_set(JsonDocument &doc) {
     rly_apply_gpio(idx);
     rly_save_states();
     rly_send_status();
+
+    {
+        JsonDocument evt;
+        evt["relay"] = idx;
+        evt["state"] = rly_states[idx];
+        String evt_str;
+        serializeJson(evt, evt_str);
+        smrt_event_publish(SMRT_EVT_RLY_CHANGED, evt_str.c_str());
+    }
 }
 
 /**
@@ -335,6 +353,15 @@ static void rly_handle_pulse(JsonDocument &doc) {
     rly_pulse_active[idx] = 1;
     rly_save_states();
     rly_send_status();
+
+    {
+        JsonDocument evt;
+        evt["relay"] = idx;
+        evt["state"] = rly_states[idx];
+        String evt_str;
+        serializeJson(evt, evt_str);
+        smrt_event_publish(SMRT_EVT_RLY_CHANGED, evt_str.c_str());
+    }
 }
 
 /**

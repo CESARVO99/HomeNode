@@ -366,6 +366,7 @@ static void sec_process_event(int event) {
         smrt_sec_add_event("Sistema armado", millis());
         sec_armed_dirty = true;
         Serial.println("[SEC] System ARMED");
+        smrt_event_publish(SMRT_EVT_SEC_ARMED, "{\"state\":\"armed\"}");
         break;
 
     case SMRT_SEC_STATE_ENTRY_DELAY:
@@ -379,6 +380,7 @@ static void sec_process_event(int event) {
         smrt_sec_add_event("ALARMA ACTIVADA", millis());
         sec_send_alert("alarm");
         Serial.println("[SEC] *** ALARM TRIGGERED ***");
+        smrt_event_publish(SMRT_EVT_SEC_TRIGGERED, "{\"state\":\"triggered\"}");
         break;
 
     case SMRT_SEC_STATE_DISARMED:
@@ -386,6 +388,7 @@ static void sec_process_event(int event) {
         smrt_sec_add_event("Sistema desarmado", millis());
         sec_armed_dirty = true;
         Serial.println("[SEC] System DISARMED");
+        smrt_event_publish(SMRT_EVT_SEC_DISARMED, "{\"state\":\"disarmed\"}");
         break;
 
     default:

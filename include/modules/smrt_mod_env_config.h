@@ -38,4 +38,20 @@
 #define SMRT_ENV_NVS_NAMESPACE      "env"           /**< NVS namespace for ENV module */
 #define SMRT_ENV_NVS_KEY_INTERVAL   "read_intv"     /**< NVS key: read interval */
 
+//-----------------------------------------------------------------------------
+// Alert thresholds
+//-----------------------------------------------------------------------------
+#define SMRT_ENV_TEMP_ALERT_HI      40.0f   /**< Default high temp threshold (C) */
+#define SMRT_ENV_TEMP_ALERT_LO      5.0f    /**< Default low temp threshold (C) */
+#define SMRT_ENV_HUM_ALERT_HI       85.0f   /**< Default high humidity threshold (%) */
+#define SMRT_ENV_HUM_ALERT_LO       20.0f   /**< Default low humidity threshold (%) */
+
+//-----------------------------------------------------------------------------
+// Alert bitmask
+//-----------------------------------------------------------------------------
+#define SMRT_ENV_ALERT_TEMP_HI      0x01
+#define SMRT_ENV_ALERT_TEMP_LO      0x02
+#define SMRT_ENV_ALERT_HUM_HI       0x04
+#define SMRT_ENV_ALERT_HUM_LO       0x08
+
 #endif // SMRT_MOD_ENV_CONFIG_H

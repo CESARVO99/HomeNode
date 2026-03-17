@@ -499,6 +499,9 @@ static void plg_get_telemetry(void *data) {
     obj["voltage"]  = plg_voltage;
     obj["current"]  = plg_current;
     obj["power"]    = plg_power;
+    obj["apparent_power"] = plg_power;
+    obj["power_factor"]   = 1.0f;
+    obj["pf_note"]        = "apparent_only";
     obj["energy"]   = plg_energy_wh;
     obj["overload"] = plg_overload;
     obj["interval"] = plg_interval;

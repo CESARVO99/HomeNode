@@ -178,6 +178,13 @@ const char *smrt_acc_get_event(int index, unsigned long *timestamp);
  */
 void smrt_acc_clear_events(void);
 
+/**
+ * @brief  Validates learn mode timeout (5s..120s).
+ * @param  ms  Timeout in milliseconds
+ * @return 1 valid, 0 invalid
+ */
+int smrt_acc_validate_learn_timeout(unsigned long ms);
+
 #ifdef __cplusplus
 }
 #endif

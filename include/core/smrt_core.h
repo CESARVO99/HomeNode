@@ -2,7 +2,7 @@
  * @file    smrt_core.h
  * @brief   Master umbrella header — includes all core platform headers
  * @project HOMENODE
- * @version 0.5.0
+ * @version 0.8.0
  *
  * All source files in src/core/ and src/modules/ should include this
  * single header instead of individual core headers.
@@ -36,12 +36,19 @@
 
 #ifndef UNIT_TEST
 #include "smrt_core_nvs.h"         /**< NVS persistence API */
+#include "smrt_core_crypto.h"      /**< AES-128-CBC encryption (NVS, WS) */
 #include "smrt_core_auth.h"        /**< Authentication & rate limiting */
 #include "smrt_core_wifi.h"        /**< WiFi management */
 #include "smrt_core_ws.h"          /**< WebSocket server */
 #include "smrt_core_http.h"        /**< HTTP server */
 #include "smrt_core_ota.h"         /**< OTA update */
 #include "smrt_core_webui.h"       /**< Embedded web interface */
+#include "smrt_core_time.h"        /**< NTP time synchronization */
+#include "smrt_core_event.h"       /**< Event bus */
+#include "smrt_core_sched.h"       /**< Task scheduler */
+#include "smrt_core_mqtt.h"        /**< MQTT client */
+#include "smrt_core_webhook.h"     /**< HTTP webhook notifications */
+#include "smrt_core_backup.h"      /**< Config backup/restore */
 #endif
 
 #endif // SMRT_CORE_H

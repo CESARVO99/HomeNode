@@ -2,7 +2,7 @@
  * @file    smrt_main.cpp
  * @brief   HomeNode entry point — simplified setup/loop with modular architecture
  * @project HOMENODE
- * @version 0.7.0
+ * @version 0.8.0
  *
  * The main file is intentionally minimal. All functionality is delegated to
  * core subsystems and registered modules:
@@ -144,6 +144,16 @@ void loop() {
 
     // Module loop
     smrt_module_loop_all();
+
+    // Scheduler loop
+    #ifdef SMRT_SCHED
+    smrt_sched_loop();
+    #endif
+
+    // MQTT loop (reconnect + process messages)
+    #ifdef SMRT_MQTT
+    smrt_mqtt_loop();
+    #endif
 
     // WebSocket cleanup + session timeout
     smrt_ws.cleanupClients();

@@ -164,6 +164,75 @@ void test_config_nvs_namespace(void) {
 }
 
 //=============================================================================
+// Test: alert check logic
+//=============================================================================
+
+void test_check_alert_no_alert(void) {
+    // All values within normal range
+    int result = smrt_env_check_alert(22.0f, 50.0f, 40.0f, 5.0f, 85.0f, 20.0f);
+    TEST_ASSERT_EQUAL(0, result);
+}
+
+void test_check_alert_temp_hi(void) {
+    int result = smrt_env_check_alert(41.0f, 50.0f, 40.0f, 5.0f, 85.0f, 20.0f);
+    TEST_ASSERT_TRUE(result & SMRT_ENV_ALERT_TEMP_HI);
+    TEST_ASSERT_FALSE(result & SMRT_ENV_ALERT_TEMP_LO);
+}
+
+void test_check_alert_temp_lo(void) {
+    int result = smrt_env_check_alert(4.0f, 50.0f, 40.0f, 5.0f, 85.0f, 20.0f);
+    TEST_ASSERT_TRUE(result & SMRT_ENV_ALERT_TEMP_LO);
+    TEST_ASSERT_FALSE(result & SMRT_ENV_ALERT_TEMP_HI);
+}
+
+void test_check_alert_hum_hi(void) {
+    int result = smrt_env_check_alert(22.0f, 90.0f, 40.0f, 5.0f, 85.0f, 20.0f);
+    TEST_ASSERT_TRUE(result & SMRT_ENV_ALERT_HUM_HI);
+}
+
+void test_check_alert_hum_lo(void) {
+    int result = smrt_env_check_alert(22.0f, 10.0f, 40.0f, 5.0f, 85.0f, 20.0f);
+    TEST_ASSERT_TRUE(result & SMRT_ENV_ALERT_HUM_LO);
+}
+
+void test_check_alert_multiple(void) {
+    // Both temp hi and hum hi
+    int result = smrt_env_check_alert(50.0f, 90.0f, 40.0f, 5.0f, 85.0f, 20.0f);
+    TEST_ASSERT_TRUE(result & SMRT_ENV_ALERT_TEMP_HI);
+    TEST_ASSERT_TRUE(result & SMRT_ENV_ALERT_HUM_HI);
+}
+
+void test_check_alert_exact_threshold(void) {
+    // Exactly at threshold — not triggered (> not >=)
+    int result = smrt_env_check_alert(40.0f, 85.0f, 40.0f, 5.0f, 85.0f, 20.0f);
+    TEST_ASSERT_EQUAL(0, result);
+}
+
+//=============================================================================
+// Test: threshold validation
+//=============================================================================
+
+void test_validate_threshold_valid(void) {
+    TEST_ASSERT_EQUAL(1, smrt_env_validate_threshold(22.0f, -10.0f, 80.0f));
+}
+
+void test_validate_threshold_min_boundary(void) {
+    TEST_ASSERT_EQUAL(1, smrt_env_validate_threshold(-10.0f, -10.0f, 80.0f));
+}
+
+void test_validate_threshold_max_boundary(void) {
+    TEST_ASSERT_EQUAL(1, smrt_env_validate_threshold(80.0f, -10.0f, 80.0f));
+}
+
+void test_validate_threshold_below_min(void) {
+    TEST_ASSERT_EQUAL(0, smrt_env_validate_threshold(-11.0f, -10.0f, 80.0f));
+}
+
+void test_validate_threshold_above_max(void) {
+    TEST_ASSERT_EQUAL(0, smrt_env_validate_threshold(81.0f, -10.0f, 80.0f));
+}
+
+//=============================================================================
 // Test runner
 //=============================================================================
 
@@ -189,6 +258,22 @@ int main(int argc, char **argv) {
     RUN_TEST(test_initial_temperature);
     RUN_TEST(test_initial_humidity);
     RUN_TEST(test_initial_status);
+
+    // Alert check logic
+    RUN_TEST(test_check_alert_no_alert);
+    RUN_TEST(test_check_alert_temp_hi);
+    RUN_TEST(test_check_alert_temp_lo);
+    RUN_TEST(test_check_alert_hum_hi);
+    RUN_TEST(test_check_alert_hum_lo);
+    RUN_TEST(test_check_alert_multiple);
+    RUN_TEST(test_check_alert_exact_threshold);
+
+    // Threshold validation
+    RUN_TEST(test_validate_threshold_valid);
+    RUN_TEST(test_validate_threshold_min_boundary);
+    RUN_TEST(test_validate_threshold_max_boundary);
+    RUN_TEST(test_validate_threshold_below_min);
+    RUN_TEST(test_validate_threshold_above_max);
 
     // Module descriptor
     RUN_TEST(test_descriptor_id);

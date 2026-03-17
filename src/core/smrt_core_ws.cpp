@@ -2,7 +2,7 @@
  * @file    smrt_core_ws.cpp
  * @brief   WebSocket server with authentication, rate limiting, module dispatch
  * @project HOMENODE
- * @version 0.7.0
+ * @version 0.8.0
  *
  * Security features (v0.4.1):
  *   - WebSocket authentication via "auth" command (PIN-based)
@@ -267,6 +267,36 @@ static void smrt_ws_dispatch_command(JsonDocument &doc, uint32_t client_id) {
         String respStr;
         serializeJson(resp, respStr);
         smrt_ws.text(client_id, respStr);
+        return;
+    }
+
+    /* Scheduler commands (requires auth) */
+    #ifdef SMRT_SCHED
+    if (strncmp(cmd, "sched_", 6) == 0 || strcmp(cmd, "time_set_tz") == 0) {
+        smrt_sched_ws_handler(cmd, (void *)&doc, client_id);
+        return;
+    }
+    #endif
+
+    /* MQTT commands (requires auth) */
+    #ifdef SMRT_MQTT
+    if (strncmp(cmd, "mqtt_", 5) == 0) {
+        smrt_mqtt_ws_handler(cmd, (void *)&doc, client_id);
+        return;
+    }
+    #endif
+
+    /* Webhook commands (requires auth) */
+    #ifdef SMRT_WEBHOOK
+    if (strncmp(cmd, "webhook_", 8) == 0) {
+        smrt_webhook_ws_handler(cmd, (void *)&doc, client_id);
+        return;
+    }
+    #endif
+
+    /* Config backup commands (requires auth) */
+    if (strncmp(cmd, "cfg_", 4) == 0) {
+        smrt_backup_ws_handler(cmd, (void *)&doc, client_id);
         return;
     }
 

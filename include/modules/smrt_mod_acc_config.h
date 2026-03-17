@@ -56,4 +56,9 @@
 #define SMRT_ACC_NVS_KEY_PULSE      "pulse_ms"      /**< Pulse duration */
 #define SMRT_ACC_NVS_KEY_EVENTS     "events"        /**< Event log JSON blob */
 
+//-----------------------------------------------------------------------------
+// Learn mode
+//-----------------------------------------------------------------------------
+#define SMRT_ACC_LEARN_TIMEOUT_MS   30000   /**< Learn mode auto-timeout (30s) */
+
 #endif // SMRT_MOD_ACC_CONFIG_H

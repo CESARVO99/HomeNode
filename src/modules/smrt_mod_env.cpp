@@ -41,6 +41,12 @@ static unsigned long env_read_interval  = SMRT_ENV_READ_INTERVAL_MS;
 #ifndef UNIT_TEST
 static unsigned long env_last_read_ms   = 0;         /**< Timestamp of last read */
 static DHT          env_dht(SMRT_ENV_DHT_PIN, SMRT_ENV_DHT_TYPE);
+static float env_alert_temp_hi = SMRT_ENV_TEMP_ALERT_HI;
+static float env_alert_temp_lo = SMRT_ENV_TEMP_ALERT_LO;
+static float env_alert_hum_hi  = SMRT_ENV_HUM_ALERT_HI;
+static float env_alert_hum_lo  = SMRT_ENV_HUM_ALERT_LO;
+static bool  env_alerts_enabled = false;
+static int   env_last_alert = 0;
 #endif
 
 //=============================================================================
@@ -100,6 +106,20 @@ int smrt_env_get_status(void) {
     return env_last_ok;
 }
 
+int smrt_env_check_alert(float temp, float hum, float t_hi, float t_lo,
+                          float h_hi, float h_lo) {
+    int result = 0;
+    if (temp > t_hi) result |= SMRT_ENV_ALERT_TEMP_HI;
+    if (temp < t_lo) result |= SMRT_ENV_ALERT_TEMP_LO;
+    if (hum > h_hi)  result |= SMRT_ENV_ALERT_HUM_HI;
+    if (hum < h_lo)  result |= SMRT_ENV_ALERT_HUM_LO;
+    return result;
+}
+
+int smrt_env_validate_threshold(float value, float min, float max) {
+    return (value >= min && value <= max) ? 1 : 0;
+}
+
 //=============================================================================
 // Hardware-dependent code (ESP32 only)
 //=============================================================================
@@ -152,6 +172,19 @@ static void env_init(void) {
         env_read_interval = (unsigned long)saved_interval;
     }
 
+    int32_t temp_hi, temp_lo, hum_hi, hum_lo;
+    bool alert_en;
+    if (smrt_nvs_get_int(SMRT_ENV_NVS_NAMESPACE, "temp_hi", &temp_hi, (int32_t)(SMRT_ENV_TEMP_ALERT_HI * 10)))
+        env_alert_temp_hi = temp_hi / 10.0f;
+    if (smrt_nvs_get_int(SMRT_ENV_NVS_NAMESPACE, "temp_lo", &temp_lo, (int32_t)(SMRT_ENV_TEMP_ALERT_LO * 10)))
+        env_alert_temp_lo = temp_lo / 10.0f;
+    if (smrt_nvs_get_int(SMRT_ENV_NVS_NAMESPACE, "hum_hi", &hum_hi, (int32_t)(SMRT_ENV_HUM_ALERT_HI * 10)))
+        env_alert_hum_hi = hum_hi / 10.0f;
+    if (smrt_nvs_get_int(SMRT_ENV_NVS_NAMESPACE, "hum_lo", &hum_lo, (int32_t)(SMRT_ENV_HUM_ALERT_LO * 10)))
+        env_alert_hum_lo = hum_lo / 10.0f;
+    smrt_nvs_get_bool(SMRT_ENV_NVS_NAMESPACE, "alert_en", &alert_en, false);
+    env_alerts_enabled = alert_en;
+
     // First read
     env_read_sensor();
     env_last_read_ms = millis();
@@ -170,6 +203,25 @@ static void env_loop(void) {
     if (now - env_last_read_ms >= env_read_interval) {
         env_last_read_ms = now;
         env_read_sensor();
+
+        /* Alert check */
+        if (env_alerts_enabled) {
+            int alert = smrt_env_check_alert(env_last_temp, env_last_hum,
+                                              env_alert_temp_hi, env_alert_temp_lo,
+                                              env_alert_hum_hi, env_alert_hum_lo);
+            if (alert != 0 && alert != env_last_alert) {
+                env_last_alert = alert;
+                JsonDocument evt;
+                evt["alert"] = alert;
+                evt["temp"]  = env_last_temp;
+                evt["hum"]   = env_last_hum;
+                String evt_str;
+                serializeJson(evt, evt_str);
+                smrt_event_publish(SMRT_EVT_ENV_ALERT, evt_str.c_str());
+            } else if (alert == 0) {
+                env_last_alert = 0;
+            }
+        }
     }
 }
 
@@ -255,6 +307,43 @@ static void env_ws_handler(const char *cmd, void *doc, void *client) {
         return;
     }
 
+    if (strcmp(cmd, "set_alert") == 0) {
+        JsonDocument &json = *(JsonDocument *)doc;
+        float t_hi = json["temp_hi"] | env_alert_temp_hi;
+        float t_lo = json["temp_lo"] | env_alert_temp_lo;
+        float h_hi = json["hum_hi"]  | env_alert_hum_hi;
+        float h_lo = json["hum_lo"]  | env_alert_hum_lo;
+        bool  enabled = json["enabled"] | env_alerts_enabled;
+
+        env_alert_temp_hi = t_hi;
+        env_alert_temp_lo = t_lo;
+        env_alert_hum_hi  = h_hi;
+        env_alert_hum_lo  = h_lo;
+        env_alerts_enabled = enabled;
+
+        smrt_nvs_set_int(SMRT_ENV_NVS_NAMESPACE, "temp_hi", (int32_t)(t_hi * 10));
+        smrt_nvs_set_int(SMRT_ENV_NVS_NAMESPACE, "temp_lo", (int32_t)(t_lo * 10));
+        smrt_nvs_set_int(SMRT_ENV_NVS_NAMESPACE, "hum_hi",  (int32_t)(h_hi * 10));
+        smrt_nvs_set_int(SMRT_ENV_NVS_NAMESPACE, "hum_lo",  (int32_t)(h_lo * 10));
+        smrt_nvs_set_bool(SMRT_ENV_NVS_NAMESPACE, "alert_en", enabled);
+        return;
+    }
+
+    if (strcmp(cmd, "get_alert") == 0) {
+        JsonDocument resp;
+        resp["type"]     = "env_alert_config";
+        resp["temp_hi"]  = env_alert_temp_hi;
+        resp["temp_lo"]  = env_alert_temp_lo;
+        resp["hum_hi"]   = env_alert_hum_hi;
+        resp["hum_lo"]   = env_alert_hum_lo;
+        resp["enabled"]  = env_alerts_enabled;
+        String output;
+        serializeJson(resp, output);
+        extern AsyncWebSocket smrt_ws;
+        smrt_ws.textAll(output);
+        return;
+    }
+
     Serial.println("[ENV] Unknown sub-command: " + String(cmd));
 }
 
@@ -269,6 +358,10 @@ static void env_get_telemetry(void *data) {
     obj["temperature"] = env_last_temp;
     obj["humidity"]    = env_last_hum;
     obj["ok"]          = (bool)env_last_ok;
+    obj["alert_enabled"] = env_alerts_enabled;
+    if (env_alerts_enabled) {
+        obj["alert"] = env_last_alert;
+    }
 }
 
 //=============================================================================
