@@ -2,7 +2,7 @@
  * @file    smrt_core_webui.h
  * @brief   Base HTML/CSS/JS web interface stored in PROGMEM
  * @project HOMENODE
- * @version 0.9.0
+ * @version 1.0.0
  *
  * Full dashboard with:
  *   - Connection status card
@@ -194,6 +194,23 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                     <div class="sys-label">NTP</div>
                     <div id="sysNtp" class="sys-value st-off">No sync</div>
                 </div>
+            </div>
+        </div>
+        <!-- Node Identity -->
+        <div class="card">
+            <h2>Nodo</h2>
+            <div class="sys-grid">
+                <div class="sys-item"><div class="sys-label">NODE ID</div><div id="nodeId" class="sys-value" style="font-size:0.75rem;">---</div></div>
+                <div class="sys-item"><div class="sys-label">NOMBRE</div><div id="nodeName" class="sys-value">---</div></div>
+                <div class="sys-item"><div class="sys-label">HABITACION</div><div id="nodeRoom" class="sys-value">---</div></div>
+                <div class="sys-item"><div class="sys-label">MODULOS</div><div id="nodeMods" class="sys-value">---</div></div>
+            </div>
+            <button class="wr btn-settings btn-sm" style="margin-top:10px;" onclick="togglePanel('nodeForm')">Configurar Nodo</button>
+            <div id="nodeForm" class="panel" style="margin-top:12px;">
+                <div class="form-group"><label>Nombre del nodo</label><input type="text" id="cfgNodeName" placeholder="Ej: Sensores Salon" maxlength="32"></div>
+                <div class="form-group"><label>Habitacion</label><input type="text" id="cfgNodeRoom" placeholder="Ej: Salon" maxlength="32"></div>
+                <button class="wr btn-secondary btn-sm" onclick="saveNode()">Guardar</button>
+                <div id="nodeMsg" class="form-msg"></div>
             </div>
         </div>
         <!-- Authentication -->
@@ -488,6 +505,11 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 if (d.ap_mode !== undefined) document.getElementById('apBanner').style.display = d.ap_mode ? '' : 'none';
                 if (d.version) document.getElementById('appFooter').textContent = 'HOMENODE \u00B7 IoT Modular Platform \u00B7 v' + d.version;
 
+                /* Node identity */
+                if (d.node_id) document.getElementById('nodeId').textContent = d.node_id;
+                if (d.name !== undefined) document.getElementById('nodeName').textContent = d.name || '(sin nombre)';
+                if (d.room !== undefined) document.getElementById('nodeRoom').textContent = d.room || '(sin asignar)';
+
                 /* Show service cards on first telemetry */
                 if (d.version) {
                     showEl('cardSched'); showEl('cardMqtt'); showEl('cardWebhook');
@@ -545,6 +567,15 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 }
                 if (d.backup_result !== undefined) showMsg('backupMsg', d.backup_result, d.backup_msg);
                 if (d.time_result !== undefined) showMsg('tzMsg', d.time_result, d.time_msg);
+
+                /* Node config responses */
+                if (d.node_result !== undefined) showMsg('nodeMsg', d.node_result, d.node_msg);
+                if (d.type === 'node_status') {
+                    document.getElementById('nodeId').textContent = d.node_id || '---';
+                    document.getElementById('nodeName').textContent = d.name || '(sin nombre)';
+                    document.getElementById('nodeRoom').textContent = d.room || '(sin asignar)';
+                    document.getElementById('nodeMods').textContent = d.modules_str || '---';
+                }
 
                 /* ENV alert config response */
                 if (d.type === 'env_alert_config') {
@@ -663,6 +694,7 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
 
         /* Request service status after connect */
         function requestServiceStatus() {
+            wsSend({cmd:'node_status'});
             wsSend({cmd:'sched_list'}); wsSend({cmd:'sched_status'});
             wsSend({cmd:'mqtt_status'}); wsSend({cmd:'webhook_list'});
             wsSend({cmd:'env_get_alert'});
@@ -864,6 +896,17 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 gmt_offset: parseInt(document.getElementById('tzGmt').value),
                 dst_offset: parseInt(document.getElementById('tzDst').value)
             });
+        }
+
+        /* Node config */
+        function saveNode() {
+            var name = document.getElementById('cfgNodeName').value.trim();
+            var room = document.getElementById('cfgNodeRoom').value.trim();
+            if (name) wsSend({cmd:'node_set_name', name: name});
+            if (room) wsSend({cmd:'node_set_room', room: room});
+            if (!name && !room) showMsg('nodeMsg', false, 'Introduce nombre o habitacion');
+            else showMsg('nodeMsg', true, 'Guardado');
+            setTimeout(function() { wsSend({cmd:'node_status'}); }, 500);
         }
     </script>
 </body>

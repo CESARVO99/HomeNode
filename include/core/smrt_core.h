@@ -2,7 +2,7 @@
  * @file    smrt_core.h
  * @brief   Master umbrella header — includes all core platform headers
  * @project HOMENODE
- * @version 0.8.0
+ * @version 1.0.0
  *
  * All source files in src/core/ and src/modules/ should include this
  * single header instead of individual core headers.
@@ -49,6 +49,7 @@
 #include "smrt_core_mqtt.h"        /**< MQTT client */
 #include "smrt_core_webhook.h"     /**< HTTP webhook notifications */
 #include "smrt_core_backup.h"      /**< Config backup/restore */
+#include "smrt_core_node.h"        /**< Node identity (multi-node) */
 #endif
 
 #endif // SMRT_CORE_H

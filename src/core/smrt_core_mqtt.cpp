@@ -2,7 +2,7 @@
  * @file    smrt_core_mqtt.cpp
  * @brief   MQTT client implementation using PubSubClient
  * @project HOMENODE
- * @version 0.8.0
+ * @version 1.0.0
  */
 
 //-----------------------------------------------------------------------------
@@ -65,6 +65,8 @@ static unsigned long smrt_mqtt_last_publish = 0;
 //-----------------------------------------------------------------------------
 // MQTT callback — handles incoming commands
 //-----------------------------------------------------------------------------
+static void smrt_mqtt_publish_discovery(void); /* Forward declaration */
+
 static void smrt_mqtt_callback(char *topic, uint8_t *payload, unsigned int len) {
     if (len > SMRT_MQTT_BUFFER_SIZE - 1) return;
 
@@ -78,6 +80,12 @@ static void smrt_mqtt_callback(char *topic, uint8_t *payload, unsigned int len) 
     JsonDocument doc;
     if (deserializeJson(doc, msg)) return;
 
+    /* Check if this is a discovery request */
+    if (strstr(topic, "discovery/request") != NULL) {
+        smrt_mqtt_publish_discovery();
+        return;
+    }
+
     const char *cmd = doc["cmd"];
     if (cmd) {
         smrt_module_dispatch(cmd, (void *)&doc, (void *)0);
@@ -89,8 +97,37 @@ static void smrt_mqtt_callback(char *topic, uint8_t *payload, unsigned int len) 
 //-----------------------------------------------------------------------------
 static void mqtt_build_topic(char *buf, size_t buf_len, const char *suffix) {
     snprintf(buf, buf_len, "%s%s/%s",
-             smrt_mqtt_topic_prefix, smrt_wifi_get_hostname(), suffix);
+             smrt_mqtt_topic_prefix, smrt_node_get_id(), suffix);
 }
+
+static unsigned long smrt_mqtt_last_discovery = 0;
+
+/**
+ * @brief  Publishes discovery announcement with node identity
+ */
+static void smrt_mqtt_publish_discovery(void) {
+    if (!smrt_mqtt_client.connected()) return;
+
+    JsonDocument doc;
+    doc["node_id"]  = smrt_node_get_id();
+    doc["name"]     = smrt_node_get_name();
+    doc["room"]     = smrt_node_get_room();
+    doc["version"]  = SMRT_PLATFORM_VERSION;
+    doc["ip"]       = WiFi.localIP().toString();
+    doc["uptime"]   = millis();
+    doc["rssi"]     = WiFi.RSSI();
+    doc["modules"]  = smrt_node_get_modules();
+
+    char mod_str[32];
+    smrt_node_modules_to_string(smrt_node_get_modules(), mod_str, sizeof(mod_str));
+    doc["modules_str"] = mod_str;
+
+    String output;
+    serializeJson(doc, output);
+    smrt_mqtt_client.publish(SMRT_MQTT_DISCOVERY_TOPIC, output.c_str());
+    SMRT_DEBUG_LOG("MQTT: Discovery announced");
+}
+
 
 //-----------------------------------------------------------------------------
 // Public functions
@@ -156,6 +193,12 @@ void smrt_mqtt_loop(void) {
             char topic[SMRT_MQTT_TOPIC_MAX];
             mqtt_build_topic(topic, sizeof(topic), "cmd");
             smrt_mqtt_client.subscribe(topic);
+
+            /* Subscribe to discovery requests */
+            smrt_mqtt_client.subscribe(SMRT_MQTT_DISCOVERY_REQ);
+
+            /* Announce on connect */
+            smrt_mqtt_publish_discovery();
         } else {
             /* Exponential backoff */
             smrt_mqtt_reconnect_interval *= 2;
@@ -170,15 +213,25 @@ void smrt_mqtt_loop(void) {
 
     smrt_mqtt_client.loop();
 
-    /* Periodic telemetry */
     unsigned long now = millis();
+
+    /* Periodic discovery */
+    if (now - smrt_mqtt_last_discovery >= SMRT_MQTT_DISCOVERY_INTERVAL_MS) {
+        smrt_mqtt_last_discovery = now;
+        smrt_mqtt_publish_discovery();
+    }
+
+    /* Periodic telemetry */
     if (now - smrt_mqtt_last_publish >= SMRT_MQTT_PUBLISH_INTERVAL) {
         smrt_mqtt_last_publish = now;
-        /* Build telemetry JSON */
+        /* Build telemetry JSON with node identity */
         JsonDocument doc;
-        doc["rssi"]   = WiFi.RSSI();
-        doc["uptime"] = millis();
-        doc["ip"]     = WiFi.localIP().toString();
+        doc["node_id"] = smrt_node_get_id();
+        doc["name"]    = smrt_node_get_name();
+        doc["room"]    = smrt_node_get_room();
+        doc["rssi"]    = WiFi.RSSI();
+        doc["uptime"]  = millis();
+        doc["ip"]      = WiFi.localIP().toString();
 
         JsonObject modules = doc["modules"].to<JsonObject>();
         smrt_module_get_telemetry_all((void *)&modules);
@@ -198,7 +251,7 @@ void smrt_mqtt_publish_event(uint8_t event_type, const char *payload) {
     const char *suffix = smrt_event_type_name(event_type);
     char topic[SMRT_MQTT_TOPIC_MAX];
     snprintf(topic, sizeof(topic), "%s%s/event/%s",
-             smrt_mqtt_topic_prefix, smrt_wifi_get_hostname(), suffix);
+             smrt_mqtt_topic_prefix, smrt_node_get_id(), suffix);
 
     smrt_mqtt_client.publish(topic, payload);
 }

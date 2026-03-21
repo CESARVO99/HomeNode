@@ -2,7 +2,7 @@
  * @file    smrt_core_mqtt_config.h
  * @brief   MQTT client configuration defines
  * @project HOMENODE
- * @version 0.8.0
+ * @version 1.0.0
  */
 
 #ifndef SMRT_CORE_MQTT_CONFIG_H
@@ -20,5 +20,10 @@
 #define SMRT_MQTT_PUBLISH_INTERVAL  30000   /**< Telemetry publish interval (ms) */
 #define SMRT_MQTT_BUFFER_SIZE       512     /**< PubSubClient buffer size */
 #define SMRT_MQTT_NVS_NAMESPACE     "mqtt"  /**< NVS namespace */
+
+/** Discovery interval — nodes announce periodically */
+#define SMRT_MQTT_DISCOVERY_INTERVAL_MS  60000  /**< Discovery announce interval (60s) */
+#define SMRT_MQTT_DISCOVERY_TOPIC   "homenode/discovery/announce" /**< Discovery announce topic */
+#define SMRT_MQTT_DISCOVERY_REQ     "homenode/discovery/request"  /**< Discovery request topic */
 
 #endif // SMRT_CORE_MQTT_CONFIG_H

@@ -294,6 +294,12 @@ static void smrt_ws_dispatch_command(JsonDocument &doc, uint32_t client_id) {
     }
     #endif
 
+    /* Node identity commands (requires auth) */
+    if (strncmp(cmd, "node_", 5) == 0) {
+        smrt_node_ws_handler(cmd, (void *)&doc, client_id);
+        return;
+    }
+
     /* Config backup commands (requires auth) */
     if (strncmp(cmd, "cfg_", 4) == 0) {
         smrt_backup_ws_handler(cmd, (void *)&doc, client_id);
@@ -316,6 +322,11 @@ static void smrt_ws_dispatch_command(JsonDocument &doc, uint32_t client_id) {
  */
 void smrt_ws_send_status(void) {
     JsonDocument doc;
+
+    // Node identity
+    doc["node_id"] = smrt_node_get_id();
+    doc["name"]    = smrt_node_get_name();
+    doc["room"]    = smrt_node_get_room();
 
     // Core telemetry
     doc["rssi"]    = WiFi.RSSI();

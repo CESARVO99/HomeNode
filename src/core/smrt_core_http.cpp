@@ -2,7 +2,7 @@
  * @file    smrt_core_http.cpp
  * @brief   HTTP server setup — global AsyncWebServer/AsyncWebSocket and route registration
  * @project HOMENODE
- * @version 0.8.0
+ * @version 1.0.0
  */
 
 //-----------------------------------------------------------------------------
@@ -38,9 +38,64 @@ void smrt_http_init(void) {
         request->send_P(200, "text/html", smrt_webui_html, smrt_ws_processor);
     });
 
+    // REST API — Node identity
+    smrt_server.on("/api/v1/node", HTTP_GET, [](AsyncWebServerRequest *request) {
+        JsonDocument doc;
+        doc["node_id"]  = smrt_node_get_id();
+        doc["name"]     = smrt_node_get_name();
+        doc["room"]     = smrt_node_get_room();
+        doc["version"]  = SMRT_PLATFORM_VERSION;
+        doc["uptime"]   = millis();
+        doc["modules"]  = smrt_node_get_modules();
+
+        char mod_str[32];
+        smrt_node_modules_to_string(smrt_node_get_modules(), mod_str, sizeof(mod_str));
+        doc["modules_str"] = mod_str;
+        doc["rssi"]     = WiFi.RSSI();
+        doc["ip"]       = WiFi.localIP().toString();
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // REST API — Current telemetry snapshot
+    smrt_server.on("/api/v1/telemetry", HTTP_GET, [](AsyncWebServerRequest *request) {
+        JsonDocument doc;
+        doc["node_id"] = smrt_node_get_id();
+        doc["rssi"]    = WiFi.RSSI();
+        doc["uptime"]  = millis();
+
+        JsonObject modules = doc["modules"].to<JsonObject>();
+        smrt_module_get_telemetry_all((void *)&modules);
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // REST API — Active modules list
+    smrt_server.on("/api/v1/modules", HTTP_GET, [](AsyncWebServerRequest *request) {
+        JsonDocument doc;
+        JsonArray arr = doc["modules"].to<JsonArray>();
+        uint8_t mask = smrt_node_get_modules();
+        const char *names[] = {"env", "rly", "sec", "plg", "nrg", "acc"};
+        for (int i = 0; i < 6; i++) {
+            if (mask & (1 << i)) arr.add(names[i]);
+        }
+        doc["count"] = smrt_node_module_count(mask);
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
     // OTA services
     smrt_ota_init();
     smrt_ota_web_init();
+
+    // Node identity (must init early — other services use node_id)
+    smrt_node_init();
 
     // Crypto (must init before services that use encrypted NVS)
     #ifdef SMRT_CRYPTO
