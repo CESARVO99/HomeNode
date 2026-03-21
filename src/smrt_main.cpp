@@ -2,13 +2,13 @@
  * @file    smrt_main.cpp
  * @brief   HomeNode entry point — simplified setup/loop with modular architecture
  * @project HOMENODE
- * @version 0.8.0
+ * @version 1.1.0
  *
  * The main file is intentionally minimal. All functionality is delegated to
  * core subsystems and registered modules:
  *
  *   setup():
- *     1. smrt_register_modules()   — Conditionally registers modules via #ifdef
+ *     1. smrt_register_modules()   — Registers modules based on NVS bitmask
  *     2. Core subsystem init       — GPIO, Serial, WiFi, HTTP (which inits WS + OTA)
  *     3. smrt_module_init_all()    — Calls init() on all registered modules
  *
@@ -39,54 +39,58 @@ static unsigned long smrt_last_status_ms = 0;
 //-----------------------------------------------------------------------------
 // LED status blink (only when GPIO2 is not used by ACC lock relay)
 //-----------------------------------------------------------------------------
-#ifndef SMRT_MOD_ACC
 static unsigned long smrt_led_last_ms = 0;
-#endif
 
 //-----------------------------------------------------------------------------
-// Module registration (conditional compilation)
+// Module descriptors (extern — all modules are compiled into the binary)
+//-----------------------------------------------------------------------------
+extern const smrt_module_t smrt_mod_env;
+extern const smrt_module_t smrt_mod_rly;
+extern const smrt_module_t smrt_mod_sec;
+extern const smrt_module_t smrt_mod_plg;
+extern const smrt_module_t smrt_mod_nrg;
+extern const smrt_module_t smrt_mod_acc;
+
+//-----------------------------------------------------------------------------
+// Module registration (runtime selection from NVS bitmask)
 //
-// To enable a module, add its build flag in platformio.ini:
-//   -D SMRT_MOD_ENV    (environmental sensors)
-//   -D SMRT_MOD_SEC    (security / NFC)
-//   -D SMRT_MOD_RLY    (relay control)
-//   -D SMRT_MOD_PLG    (smart plug / energy)
-//   -D SMRT_MOD_ACC    (access control)
-//   -D SMRT_MOD_NRG    (energy monitoring)
+// All 6 modules are compiled into the firmware. At boot, the NVS bitmask
+// determines which ones are registered and active. This allows a single
+// firmware binary to work for any module combination.
+//
+// Configure via WebUI "Nodo" card or WS command node_set_modules.
 //-----------------------------------------------------------------------------
 
 /**
- * @brief  Registers all enabled modules.
- *         Called once before core init in setup().
+ * @brief  Registers modules based on the NVS bitmask.
+ *         Must be called AFTER smrt_node_init() (which is called in smrt_http_init).
+ *         However, node_init needs NVS which needs to be ready.
+ *         We read the bitmask directly from NVS here since node_init
+ *         happens later in smrt_http_init.
  * @return void
  */
 static void smrt_register_modules(void) {
-    #ifdef SMRT_MOD_ENV
-        extern const smrt_module_t smrt_mod_env;
-        smrt_module_register(&smrt_mod_env);
-    #endif
-    #ifdef SMRT_MOD_RLY
-        extern const smrt_module_t smrt_mod_rly;
-        smrt_module_register(&smrt_mod_rly);
-    #endif
-    #ifdef SMRT_MOD_SEC
-        extern const smrt_module_t smrt_mod_sec;
-        smrt_module_register(&smrt_mod_sec);
-    #endif
-    #ifdef SMRT_MOD_PLG
-        extern const smrt_module_t smrt_mod_plg;
-        smrt_module_register(&smrt_mod_plg);
-    #endif
-    #ifdef SMRT_MOD_NRG
-        extern const smrt_module_t smrt_mod_nrg;
-        smrt_module_register(&smrt_mod_nrg);
-    #endif
-    #ifdef SMRT_MOD_ACC
-        extern const smrt_module_t smrt_mod_acc;
-        smrt_module_register(&smrt_mod_acc);
-    #endif
+    /* Read module bitmask from NVS (same logic as smrt_node_init) */
+    int32_t mask_val = 0;
+    smrt_nvs_get_int(SMRT_NODE_NVS_NAMESPACE, "modules", &mask_val, SMRT_NODE_MOD_ENV);
+    uint8_t mask = (uint8_t)(mask_val & SMRT_NODE_MOD_ALL);
 
-    Serial.println("Modules registered: " + String(smrt_module_count()));
+    /* Validate — if conflicts detected, fall back to ENV only */
+    if (smrt_node_validate_modules(mask) != 0) {
+        Serial.println("[MAIN] Module conflict detected! Falling back to ENV only.");
+        mask = SMRT_NODE_MOD_ENV;
+    }
+
+    if (mask & SMRT_NODE_MOD_ENV) smrt_module_register(&smrt_mod_env);
+    if (mask & SMRT_NODE_MOD_RLY) smrt_module_register(&smrt_mod_rly);
+    if (mask & SMRT_NODE_MOD_SEC) smrt_module_register(&smrt_mod_sec);
+    if (mask & SMRT_NODE_MOD_PLG) smrt_module_register(&smrt_mod_plg);
+    if (mask & SMRT_NODE_MOD_NRG) smrt_module_register(&smrt_mod_nrg);
+    if (mask & SMRT_NODE_MOD_ACC) smrt_module_register(&smrt_mod_acc);
+
+    char mod_str[32];
+    smrt_node_modules_to_string(mask, mod_str, sizeof(mod_str));
+    Serial.printf("Modules registered: %d [%s]\n", smrt_module_count(), mod_str);
 }
 
 //-----------------------------------------------------------------------------
@@ -108,7 +112,7 @@ void setup() {
     Serial.println(" IoT Modular Platform");
     Serial.println("========================================");
 
-    // Register modules (before WiFi/HTTP so they can hook events)
+    // Register modules (reads NVS bitmask — before WiFi/HTTP so they can hook events)
     smrt_register_modules();
 
     // Core services init
@@ -150,7 +154,7 @@ void loop() {
     smrt_sched_loop();
     #endif
 
-    // MQTT loop (reconnect + process messages)
+    // MQTT loop (reconnect + process messages + discovery)
     #ifdef SMRT_MQTT
     smrt_mqtt_loop();
     #endif
@@ -166,9 +170,8 @@ void loop() {
         smrt_ws_send_status();
     }
 
-    // LED status blink (GPIO2 only if ACC module is not compiled)
-    #ifndef SMRT_MOD_ACC
-    {
+    // LED status blink (GPIO2 only if ACC module is not active — it uses GPIO2 for lock)
+    if (!smrt_node_has_module(SMRT_NODE_MOD_ACC)) {
         unsigned long led_interval = smrt_wifi_is_ap_mode()
                                      ? SMRT_LED_BLINK_AP_MS
                                      : SMRT_LED_BLINK_NORMAL_MS;
@@ -177,7 +180,6 @@ void loop() {
             smrt_gpio_toggle_state(SMRT_LED_BUILTIN);
         }
     }
-    #endif
 
     delay(SMRT_LOOP_DELAY_MS);
 }

@@ -210,6 +210,17 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                 <div class="form-group"><label>Nombre del nodo</label><input type="text" id="cfgNodeName" placeholder="Ej: Sensores Salon" maxlength="32"></div>
                 <div class="form-group"><label>Habitacion</label><input type="text" id="cfgNodeRoom" placeholder="Ej: Salon" maxlength="32"></div>
                 <button class="wr btn-secondary btn-sm" onclick="saveNode()">Guardar</button>
+                <div style="margin-top:14px;border-top:1px solid #DDE4ED;padding-top:14px;">
+                    <div class="sys-label" style="margin-bottom:8px;">MODULOS ACTIVOS</div>
+                    <div class="chk-row"><input type="checkbox" id="modEnv" checked><label for="modEnv">ENV — Ambiente</label></div>
+                    <div class="chk-row"><input type="checkbox" id="modRly"><label for="modRly">RLY — Reles</label></div>
+                    <div class="chk-row"><input type="checkbox" id="modSec"><label for="modSec">SEC — Seguridad</label></div>
+                    <div class="chk-row"><input type="checkbox" id="modPlg"><label for="modPlg">PLG — Enchufe</label></div>
+                    <div class="chk-row"><input type="checkbox" id="modNrg"><label for="modNrg">NRG — Energia</label></div>
+                    <div class="chk-row"><input type="checkbox" id="modAcc"><label for="modAcc">ACC — Acceso</label></div>
+                    <div id="modConflict" style="display:none;color:#E74C3C;font-size:0.8rem;font-weight:600;margin-top:6px;"></div>
+                    <button class="wr btn-warn btn-sm" style="margin-top:8px;" onclick="saveModules()">Aplicar Modulos (reinicia)</button>
+                </div>
                 <div id="nodeMsg" class="form-msg"></div>
             </div>
         </div>
@@ -575,6 +586,14 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
                     document.getElementById('nodeName').textContent = d.name || '(sin nombre)';
                     document.getElementById('nodeRoom').textContent = d.room || '(sin asignar)';
                     document.getElementById('nodeMods').textContent = d.modules_str || '---';
+                    /* Populate module checkboxes */
+                    var m = d.modules || 0;
+                    document.getElementById('modEnv').checked = !!(m & 0x01);
+                    document.getElementById('modRly').checked = !!(m & 0x02);
+                    document.getElementById('modSec').checked = !!(m & 0x04);
+                    document.getElementById('modPlg').checked = !!(m & 0x08);
+                    document.getElementById('modNrg').checked = !!(m & 0x10);
+                    document.getElementById('modAcc').checked = !!(m & 0x20);
                 }
 
                 /* ENV alert config response */
@@ -907,6 +926,28 @@ const char smrt_webui_html[] PROGMEM = R"rawliteral(
             if (!name && !room) showMsg('nodeMsg', false, 'Introduce nombre o habitacion');
             else showMsg('nodeMsg', true, 'Guardado');
             setTimeout(function() { wsSend({cmd:'node_status'}); }, 500);
+        }
+        function saveModules() {
+            var m = 0;
+            if (document.getElementById('modEnv').checked) m |= 0x01;
+            if (document.getElementById('modRly').checked) m |= 0x02;
+            if (document.getElementById('modSec').checked) m |= 0x04;
+            if (document.getElementById('modPlg').checked) m |= 0x08;
+            if (document.getElementById('modNrg').checked) m |= 0x10;
+            if (document.getElementById('modAcc').checked) m |= 0x20;
+            /* Client-side conflict check */
+            var cf = document.getElementById('modConflict');
+            var conflicts = [];
+            if ((m & 0x08) && (m & 0x10)) conflicts.push('PLG + NRG (comparten GPIO34-39)');
+            if ((m & 0x08) && (m & 0x20)) conflicts.push('PLG + ACC (comparten GPIO2)');
+            if (conflicts.length > 0) {
+                cf.textContent = 'Conflicto: ' + conflicts.join('; ');
+                cf.style.display = '';
+                return;
+            }
+            cf.style.display = 'none';
+            if (m === 0) { showMsg('nodeMsg', false, 'Selecciona al menos un modulo'); return; }
+            wsSend({cmd:'node_set_modules', modules: m});
         }
     </script>
 </body>
