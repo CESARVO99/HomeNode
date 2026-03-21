@@ -10,6 +10,7 @@
 //-----------------------------------------------------------------------------
 #ifndef UNIT_TEST
 #include "smrt_core.h"
+#include "smrt_mod_env.h"
 
 //-----------------------------------------------------------------------------
 // Global server instances (extern'd by other core modules)
@@ -84,6 +85,61 @@ void smrt_http_init(void) {
             if (mask & (1 << i)) arr.add(names[i]);
         }
         doc["count"] = smrt_node_module_count(mask);
+
+        String output;
+        serializeJson(doc, output);
+        request->send(200, "application/json", output);
+    });
+
+    // REST API — Historical data from ring buffers
+    smrt_server.on("/api/v1/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+        /* Params: module, channel, points (optional, default 120) */
+        String module  = request->hasParam("module")  ? request->getParam("module")->value()  : "";
+        String channel = request->hasParam("channel") ? request->getParam("channel")->value() : "";
+        int points = request->hasParam("points") ? request->getParam("points")->value().toInt() : 120;
+        if (points < 1) points = 1;
+        if (points > 360) points = 360;
+
+        /* Find the matching ring buffer */
+        smrt_ringbuf_t *rb = NULL;
+
+        if (module == "env") {
+            if (channel == "temperature") rb = smrt_env_get_ringbuf_temp();
+            else if (channel == "humidity") rb = smrt_env_get_ringbuf_hum();
+        }
+        /* Future: add PLG, NRG, etc. ring buffers here */
+
+        if (!rb) {
+            request->send(404, "application/json", "{\"error\":\"Channel not found\"}");
+            return;
+        }
+
+        /* Query with optional time range */
+        uint32_t from_ts = request->hasParam("from") ? (uint32_t)request->getParam("from")->value().toInt() : 0;
+        uint32_t to_ts   = request->hasParam("to")   ? (uint32_t)request->getParam("to")->value().toInt()   : 0;
+
+        smrt_ringbuf_sample_t *out = (smrt_ringbuf_sample_t *)malloc(points * sizeof(smrt_ringbuf_sample_t));
+        if (!out) {
+            request->send(500, "application/json", "{\"error\":\"Out of memory\"}");
+            return;
+        }
+
+        uint16_t count = 0;
+        smrt_ringbuf_query(rb, from_ts, to_ts, out, (uint16_t)points, &count);
+
+        /* Build JSON response */
+        JsonDocument doc;
+        doc["channel"]   = rb->name;
+        doc["count"]     = count;
+        doc["total"]     = smrt_ringbuf_count(rb);
+        JsonArray data = doc["data"].to<JsonArray>();
+        for (uint16_t i = 0; i < count; i++) {
+            JsonArray point = data.add<JsonArray>();
+            point.add(out[i].timestamp);
+            point.add(out[i].value);
+        }
+
+        free(out);
 
         String output;
         serializeJson(doc, output);

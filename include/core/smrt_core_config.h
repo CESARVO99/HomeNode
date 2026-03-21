@@ -15,7 +15,7 @@
 // Platform identity
 //-----------------------------------------------------------------------------
 #define SMRT_PLATFORM_NAME          "HomeNode"      /**< Platform display name */
-#define SMRT_PLATFORM_VERSION       "1.1.0"         /**< Platform firmware version */
+#define SMRT_PLATFORM_VERSION       "1.2.0"         /**< Platform firmware version */
 
 //-----------------------------------------------------------------------------
 // Network — HTTP / WebSocket

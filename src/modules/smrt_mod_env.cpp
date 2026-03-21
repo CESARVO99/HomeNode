@@ -41,6 +41,12 @@ static unsigned long env_read_interval  = SMRT_ENV_READ_INTERVAL_MS;
 #ifndef UNIT_TEST
 static unsigned long env_last_read_ms   = 0;         /**< Timestamp of last read */
 static DHT          env_dht(SMRT_ENV_DHT_PIN, SMRT_ENV_DHT_TYPE);
+/* Historical data ring buffers (2 channels: temp + humidity) */
+static smrt_ringbuf_sample_t env_rb_temp_data[SMRT_RINGBUF_DEFAULT_CAPACITY];
+static smrt_ringbuf_sample_t env_rb_hum_data[SMRT_RINGBUF_DEFAULT_CAPACITY];
+static smrt_ringbuf_t env_rb_temp;
+static smrt_ringbuf_t env_rb_hum;
+
 static float env_alert_temp_hi = SMRT_ENV_TEMP_ALERT_HI;
 static float env_alert_temp_lo = SMRT_ENV_TEMP_ALERT_LO;
 static float env_alert_hum_hi  = SMRT_ENV_HUM_ALERT_HI;
@@ -185,6 +191,10 @@ static void env_init(void) {
     smrt_nvs_get_bool(SMRT_ENV_NVS_NAMESPACE, "alert_en", &alert_en, false);
     env_alerts_enabled = alert_en;
 
+    // Init ring buffers for historical data
+    smrt_ringbuf_init(&env_rb_temp, env_rb_temp_data, SMRT_RINGBUF_DEFAULT_CAPACITY, "env.temperature");
+    smrt_ringbuf_init(&env_rb_hum, env_rb_hum_data, SMRT_RINGBUF_DEFAULT_CAPACITY, "env.humidity");
+
     // First read
     env_read_sensor();
     env_last_read_ms = millis();
@@ -203,6 +213,19 @@ static void env_loop(void) {
     if (now - env_last_read_ms >= env_read_interval) {
         env_last_read_ms = now;
         env_read_sensor();
+
+        /* Push to ring buffers for historical data */
+        if (env_last_ok) {
+            uint32_t ts = (uint32_t)(now / 1000); /* Seconds since boot (or NTP if synced) */
+            struct tm timeinfo;
+            if (getLocalTime(&timeinfo, 0)) {
+                time_t epoch;
+                time(&epoch);
+                ts = (uint32_t)epoch;
+            }
+            smrt_ringbuf_push(&env_rb_temp, env_last_temp, ts);
+            smrt_ringbuf_push(&env_rb_hum, env_last_hum, ts);
+        }
 
         /* Alert check */
         if (env_alerts_enabled) {
@@ -235,6 +258,9 @@ extern AsyncWebSocket smrt_ws;
  * @brief  Sends the current sensor reading as a JSON response.
  * @return void
  */
+smrt_ringbuf_t *smrt_env_get_ringbuf_temp(void) { return &env_rb_temp; }
+smrt_ringbuf_t *smrt_env_get_ringbuf_hum(void)  { return &env_rb_hum; }
+
 static void env_send_reading(void) {
     JsonDocument resp;
     resp["type"]        = "env_read";

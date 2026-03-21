@@ -102,6 +102,18 @@ int smrt_env_check_alert(float temp, float hum, float t_hi, float t_lo,
  */
 int smrt_env_validate_threshold(float value, float min, float max);
 
+#ifndef UNIT_TEST
+/**
+ * @brief  Returns pointer to the temperature ring buffer
+ */
+smrt_ringbuf_t *smrt_env_get_ringbuf_temp(void);
+
+/**
+ * @brief  Returns pointer to the humidity ring buffer
+ */
+smrt_ringbuf_t *smrt_env_get_ringbuf_hum(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

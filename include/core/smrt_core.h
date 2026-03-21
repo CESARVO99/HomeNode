@@ -50,6 +50,7 @@
 #include "smrt_core_webhook.h"     /**< HTTP webhook notifications */
 #include "smrt_core_backup.h"      /**< Config backup/restore */
 #include "smrt_core_node.h"        /**< Node identity (multi-node) */
+#include "smrt_core_ringbuf.h"     /**< Circular buffer for historical data */
 #endif
 
 #endif // SMRT_CORE_H
