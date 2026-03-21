@@ -1,7 +1,7 @@
-# HomeNode v0.8.0 — Guia de Administrador
+# HomeNode v0.9.0 — Guia de Administrador
 
 > **Plataforma IoT domestica modular para ESP32**
-> Fecha: 2026-03-17 | Version: 0.8.0
+> Fecha: 2026-03-21 | Version: 0.9.0
 > Audiencia: Administradores, integradores, desarrolladores
 
 ---
@@ -31,7 +31,8 @@
 21. [Tests Unitarios y QA](#21-tests-unitarios-y-qa)
 22. [Mapa de Pines y Conflictos de Hardware](#22-mapa-de-pines-y-conflictos-de-hardware)
 23. [Referencia Rapida de Comandos WS](#23-referencia-rapida-de-comandos-ws)
-24. [Historial de Versiones](#24-historial-de-versiones)
+24. [Dashboard Web — Paneles de la WebUI](#24-dashboard-web--paneles-de-la-webui)
+25. [Historial de Versiones](#25-historial-de-versiones)
 
 ---
 
@@ -39,7 +40,7 @@
 
 **HomeNode** es una plataforma firmware modular para automatizacion domestica sobre hardware ESP32-WROOM (NodeMCU-32S). Permite combinar hasta 6 modulos funcionales independientes en un solo dispositivo, activados selectivamente en tiempo de compilacion.
 
-### Caracteristicas v0.8.0
+### Caracteristicas v0.9.0
 
 | Categoria | Descripcion |
 |-----------|-------------|
@@ -1153,7 +1154,60 @@ Genera en `reports/<timestamp>/`:
 
 ---
 
-## 24. Historial de Versiones
+## 24. Dashboard Web — Paneles de la WebUI
+
+La interfaz web accesible en `http://<IP-del-dispositivo>/` incluye los siguientes paneles (v0.9.0):
+
+### Paneles principales
+
+| Panel | Descripcion | Requiere auth |
+|-------|-------------|:------------:|
+| **Conexion** | Estado WS (connected/reconnecting/disconnected), IP del dispositivo | No |
+| **Modo AP** | Banner visible solo en modo Access Point, informa que no hay WiFi | No |
+| **Sistema** | Uptime, RSSI (barra visual), red WiFi, clientes WS, hora NTP, estado sync | No |
+| **Autenticacion** | Formulario PIN para obtener sesion autenticada | No |
+
+### Paneles de modulos (visibles si el modulo esta registrado)
+
+| Panel | Datos mostrados | Acciones (requieren auth) |
+|-------|----------------|--------------------------|
+| **Ambiente (ENV)** | Temperatura, humedad, estado sensor, banner alerta | Configurar alertas (umbrales temp/hum, habilitar/deshabilitar) |
+| **Reles (RLY)** | Estado ON/OFF por rele, nombre configurable | Toggle ON/OFF, pulso por rele |
+| **Seguridad (SEC)** | Estado alarma (5 estados), PIR, puerta, vibracion, eventos | Armar/desarmar sistema |
+| **Enchufe (PLG)** | Voltaje, corriente, potencia, energia, banner sobrecarga | Toggle ON/OFF |
+| **Energia (NRG)** | V/A/W/kWh por canal, alerta potencia | Solo lectura |
+| **Acceso (ACC)** | Estado cerradura, UIDs, eventos, pulso, ultimo evento, banner learn mode | Toggle cerradura, aprender UID NFC, cancelar aprendizaje |
+
+### Paneles de servicios
+
+| Panel | Descripcion | Acciones (requieren auth) |
+|-------|-------------|--------------------------|
+| **Programador** | Lista de tareas cron activas (hora, dias, accion) | Crear/eliminar tareas (8 slots, bitmask dias) |
+| **MQTT** | Estado conexion, servidor configurado | Configurar servidor/puerto/credenciales, habilitar/deshabilitar |
+| **Webhooks** | Lista de webhooks activos con URL | Crear/eliminar webhooks (4 slots), filtros de eventos, test |
+| **Backup/Restaurar** | Area JSON para export/import | Exportar config, importar con doble confirmacion |
+| **Zona Horaria** | Offsets GMT/DST para NTP | Guardar timezone |
+
+### Paneles de configuracion
+
+| Panel | Descripcion | Acciones |
+|-------|-------------|----------|
+| **WiFi** | Panel desplegable con formulario SSID/password | Guardar credenciales (requiere PIN) |
+| **Mantenimiento** | Enlace a pagina de actualizacion firmware | Acceso a `/update` (HTTP Basic Auth) |
+
+### Notas tecnicas WebUI
+
+- El HTML/CSS/JS esta almacenado en PROGMEM (~15KB) dentro de `smrt_core_webui.h`
+- La comunicacion es 100% WebSocket JSON (sin peticiones HTTP adicionales)
+- Los paneles de modulos se muestran automaticamente al recibir la primera telemetria
+- Los paneles de servicios se muestran al recibir la version del firmware
+- Los botones de accion tienen clase CSS `.wr` y se deshabilitan si no hay sesion autenticada
+- Los paneles desplegables usan clase `.panel` con toggle via `classList.toggle('open')`
+- Las respuestas de formulario se muestran en elementos `.form-msg` con auto-limpieza a 5 segundos
+
+---
+
+## 25. Historial de Versiones
 
 | Version | Fecha | Cambios principales |
 |---------|-------|---------------------|
@@ -1165,3 +1219,4 @@ Genera en `reports/<timestamp>/`:
 | 0.6.0 | 2026-03-13 | Modulos NRG, PLG, refactorizacion |
 | 0.7.0 | 2026-03-16 | Auditoria seguridad, filtrado IP LAN, OTA mejorado |
 | 0.8.0 | 2026-03-17 | NVS cifrado AES-128, NTP, Scheduler, Bus de eventos, MQTT, Webhooks, Backup, Alertas ENV, Learn mode ACC, Power factor NRG |
+| 0.9.0 | 2026-03-21 | Dashboard WebUI completo con paneles de servicios (Scheduler, MQTT, Webhooks, Backup, Timezone, Alertas ENV, Learn mode ACC) |

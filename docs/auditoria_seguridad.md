@@ -1,16 +1,16 @@
-# HomeNode v0.8.0 — Auditoria de Seguridad y Funcionalidad
+# HomeNode v0.9.0 — Auditoria de Seguridad y Funcionalidad
 
 > **Revision estatica de codigo | Analisis de superficie de ataque**
-> Fecha: 2026-03-17 | Version auditada: 0.8.0 (actualizada desde 0.4.0)
+> Fecha: 2026-03-21 | Version auditada: 0.9.0 (actualizada desde 0.4.0)
 > Auditor: Claude (asistido por IA)
 
 ---
 
-## Nota de Actualizacion v0.8.0
+## Nota de Actualizacion v0.9.0
 
-Esta auditoria fue realizada inicialmente sobre la version 0.4.0. La version 0.8.0 incorpora las siguientes mejoras de seguridad y funcionalidad identificadas en la auditoria original:
+Esta auditoria fue realizada inicialmente sobre la version 0.4.0. Las versiones 0.5.0-0.9.0 incorporan las siguientes mejoras de seguridad y funcionalidad identificadas en la auditoria original:
 
-| Item | Estado v0.4.0 | Estado v0.8.0 |
+| Item | Estado v0.4.0 | Estado v0.9.0 |
 |------|--------------|--------------|
 | V-01 Autenticacion WS | CRITICO | RESUELTO (v0.3.0) |
 | V-02 Rate limiting PIN | CRITICO | RESUELTO (v0.3.0) |
@@ -30,8 +30,10 @@ Esta auditoria fue realizada inicialmente sobre la version 0.4.0. La version 0.8
 | Learn mode ACC | Gap funcional | RESUELTO (v0.8.0) |
 | Power factor NRG | Gap funcional | RESUELTO (v0.8.0) |
 | Backup/Restore | Gap funcional | RESUELTO (v0.8.0) |
+| WebUI completa | Gap funcional | RESUELTO (v0.9.0 — paneles para todos los servicios) |
+| F-23 WebUI incompleta | ALTA | RESUELTO (v0.5.0 modulos + v0.9.0 servicios) |
 
-**Riesgo actual v0.8.0: MEDIO** — Aceptable para uso en LAN domestica de confianza. Pendiente Secure Boot y firma de firmware para entornos de mayor riesgo.
+**Riesgo actual v0.9.0: MEDIO** — Aceptable para uso en LAN domestica de confianza. Pendiente Secure Boot y firma de firmware para entornos de mayor riesgo.
 
 ---
 
@@ -57,11 +59,13 @@ Esta auditoria fue realizada inicialmente sobre la version 0.4.0. La version 0.8
 | Metrica | Valor |
 |---------|-------|
 | Modulos implementados | 6/6 |
-| Tests unitarios | 331/331 PASS (100%) |
-| Build ESP32 | OK (RAM 15.1%, Flash 70.9%) |
-| Analisis estatico | 0 errores, 0 warnings, 2 style |
-| LOC totales | 10,933 |
-| Funciones | 194 |
+| Servicios core | 7 (crypto, NTP, event bus, scheduler, MQTT, webhooks, backup) |
+| Tests unitarios | 377/377 PASS (100%) |
+| Build ESP32 | OK (RAM 15.7%, Flash 77.3%) |
+| Analisis estatico | 0 errores, 0 warnings, 3 style |
+| LOC totales | 15,698 |
+| Funciones | 285 |
+| WebUI | Dashboard completo con paneles para 6 modulos + 7 servicios |
 
 ### Hallazgos
 
@@ -585,5 +589,5 @@ Estas 5 acciones elevan la seguridad de **CRITICA** a **MEDIA**, convirtiendo el
 
 ---
 
-> **HomeNode v0.4.0** — Auditoria de Seguridad y Funcionalidad
-> Generada: 2026-03-14
+> **HomeNode v0.9.0** — Auditoria de Seguridad y Funcionalidad
+> Actualizada: 2026-03-21 (original: 2026-03-14)
