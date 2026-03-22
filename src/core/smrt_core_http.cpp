@@ -11,6 +11,7 @@
 #ifndef UNIT_TEST
 #include "smrt_core.h"
 #include "smrt_mod_env.h"
+#include <LittleFS.h>
 
 //-----------------------------------------------------------------------------
 // Global server instances (extern'd by other core modules)
@@ -34,10 +35,20 @@ void smrt_http_init(void) {
     // WebSocket
     smrt_ws_init();
 
-    // Main page
+    // LittleFS filesystem init
+    if (!LittleFS.begin(true)) {
+        Serial.println("[HTTP] LittleFS mount FAILED — dashboard unavailable");
+    } else {
+        Serial.println("[HTTP] LittleFS mounted OK");
+    }
+
+    // Main page from LittleFS
     smrt_server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-        request->send_P(200, "text/html", smrt_webui_html, smrt_ws_processor);
+        request->send(LittleFS, "/index.html", "text/html");
     });
+
+    // Serve any static file from LittleFS (CSS, JS, images if added later)
+    smrt_server.serveStatic("/static/", LittleFS, "/static/");
 
     // REST API — Node identity
     smrt_server.on("/api/v1/node", HTTP_GET, [](AsyncWebServerRequest *request) {

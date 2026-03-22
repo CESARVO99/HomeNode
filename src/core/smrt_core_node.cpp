@@ -112,7 +112,7 @@ static uint8_t smrt_node_modules_mask             = SMRT_NODE_MOD_ENV; /* Defaul
  */
 static void smrt_node_generate_id(void) {
     uint64_t mac = ESP.getEfuseMac();
-    uint8_t *bytes = (uint8_t *)&mac;
+    uint8_t *bytes = reinterpret_cast<uint8_t *>(&mac);
     snprintf(smrt_node_id, SMRT_NODE_ID_MAX, "%02X%02X%02X%02X%02X%02X",
              bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5]);
 }
