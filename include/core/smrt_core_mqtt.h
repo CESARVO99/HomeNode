@@ -58,6 +58,9 @@ void smrt_mqtt_get_telemetry(void *json_obj);
 /** @brief Returns 1 if MQTT is connected */
 int smrt_mqtt_is_connected(void);
 
+/** @brief Publishes to an arbitrary topic */
+void smrt_mqtt_publish_to(const char *topic, const char *payload);
+
 #endif // UNIT_TEST
 
 #ifdef __cplusplus

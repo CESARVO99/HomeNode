@@ -275,6 +275,14 @@ int smrt_mqtt_is_connected(void) {
 }
 
 /**
+ * @brief  Publishes to an arbitrary MQTT topic
+ */
+void smrt_mqtt_publish_to(const char *topic, const char *payload) {
+    if (!smrt_mqtt_client.connected() || !topic || !payload) return;
+    smrt_mqtt_client.publish(topic, payload);
+}
+
+/**
  * @brief  Handles MQTT WebSocket commands
  */
 void smrt_mqtt_ws_handler(const char *cmd, void *json_doc, uint32_t client_id) {

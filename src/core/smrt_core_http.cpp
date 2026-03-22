@@ -190,6 +190,9 @@ void smrt_http_init(void) {
     smrt_webhook_init();
     #endif
 
+    // Automation rules engine
+    smrt_auto_init();
+
     // Start
     smrt_server.begin();
     Serial.println("HTTP server started on port " + String(SMRT_WEB_SERVER_PORT));

@@ -294,6 +294,12 @@ static void smrt_ws_dispatch_command(JsonDocument &doc, uint32_t client_id) {
     }
     #endif
 
+    /* Automation rule commands (requires auth) */
+    if (strncmp(cmd, "auto_", 5) == 0) {
+        smrt_auto_ws_handler(cmd, (void *)&doc, client_id);
+        return;
+    }
+
     /* Node identity commands (requires auth) */
     if (strncmp(cmd, "node_", 5) == 0) {
         smrt_node_ws_handler(cmd, (void *)&doc, client_id);

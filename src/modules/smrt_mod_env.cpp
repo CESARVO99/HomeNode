@@ -225,6 +225,10 @@ static void env_loop(void) {
             }
             smrt_ringbuf_push(&env_rb_temp, env_last_temp, ts);
             smrt_ringbuf_push(&env_rb_hum, env_last_hum, ts);
+
+            /* Trigger automation rules */
+            smrt_auto_check_value("env.temperature", env_last_temp);
+            smrt_auto_check_value("env.humidity", env_last_hum);
         }
 
         /* Alert check */
